@@ -6,6 +6,8 @@ import { requireRole } from '../middleware/role.middleware';
 const router = Router();
 
 router.use(authMiddleware);
+
 router.get('/:babyId', requireRole('nurse', 'parent'), reportController.getDailyReport);
+router.get('/:babyId/list', requireRole('nurse', 'parent'), reportController.getReportList);
 
 export default router;

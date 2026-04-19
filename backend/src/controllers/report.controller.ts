@@ -1,48 +1,45 @@
 import { Response } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { reportService } from '../services/report.service';
 import { AuthRequest, ApiResponse } from '../types';
 
 export const reportController = {
   async getDailyReport(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { babyId } = req.params;
-      const { date } = req.query;
+      const rawBabyId = req.params.babyId;
+      const babyId = Array.isArray(rawBabyId) ? rawBabyId[0] : rawBabyId;
 
-      // Validasi akses: parent hanya bisa akses bayi miliknya
+      // Fix: pastikan date adalah string tunggal, bukan array
+      const rawDate = req.query.date;
+      const date =
+        typeof rawDate === 'string'
+          ? rawDate
+          : new Date().toISOString().split('T')[0];
+
       if (req.user?.role === 'parent' && req.user.babyId !== babyId) {
         res.status(403).json({ success: false, error: 'Akses ditolak' });
         return;
       }
 
-      const targetDate = date as string || new Date().toISOString().split('T')[0];
+      const data = await reportService.getDailyReport(babyId as string, date);
+      const response: ApiResponse = { success: true, data };
+      res.json(response);
+    } catch (err: any) {
+      const response: ApiResponse = { success: false, error: err.message };
+      res.status(500).json(response);
+    }
+  },
 
-      const { data, error } = await supabaseAdmin
-        .from('daily_reports')
-        .select('*')
-        .eq('baby_id', babyId)
-        .eq('date', targetDate)
-        .single();
+  async getReportList(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const rawBabyId = req.params.babyId;
+      const babyId = Array.isArray(rawBabyId) ? rawBabyId[0] : rawBabyId;
 
-      if (error || !data) {
-        // Return empty report jika belum ada data
-        const response: ApiResponse = {
-          success: true,
-          data: {
-            babyId,
-            date: targetDate,
-            totalProneEvents: 0,
-            avgTemperature: 0,
-            maxTemperature: 0,
-            minTemperature: 0,
-            totalCryingEvents: 0,
-            hourlyPositions: [],
-            temperatureTimeline: [],
-          },
-        };
-        res.json(response);
+      if (req.user?.role === 'parent' && req.user.babyId !== babyId) {
+        res.status(403).json({ success: false, error: 'Akses ditolak' });
         return;
       }
 
+      const data = await reportService.getReportList(babyId as string);
       const response: ApiResponse = { success: true, data };
       res.json(response);
     } catch (err: any) {

@@ -11,6 +11,54 @@ import {
   MqttHeartbeatPayload,
   MqttDeviceRegisterPayload,
 } from '../types';
+// Tambah di bagian atas
+import { Expo, ExpoPushMessage } from 'expo-server-sdk';
+import { supabaseAdmin } from '../config/supabase';
+import axios from 'axios';
+
+const expo = new Expo();
+
+// Tambah fungsi helper
+async function sendPushNotification(
+  babyId: string,
+  title: string,
+  body: string,
+  severity: 'warning' | 'critical'
+): Promise<void> {
+  try {
+    // Ambil semua token yang terkait dengan bayi ini
+    const { data: tokens } = await supabaseAdmin
+      .from('push_tokens')
+      .select('token')
+      .or(`baby_id.eq.${babyId},role.eq.nurse`);
+
+    if (!tokens || tokens.length === 0) return;
+
+    const messages: ExpoPushMessage[] = tokens
+      .filter((t) => Expo.isExpoPushToken(t.token))
+      .map((t) => ({
+        to: t.token,
+        sound: 'default',
+        title,
+        body,
+        priority: severity === 'critical' ? 'high' : 'normal',
+        data: { babyId, severity },
+        channelId:
+          severity === 'critical'
+            ? 'smart-vision-alerts'
+            : 'smart-vision-info',
+      }));
+
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      await expo.sendPushNotificationsAsync(chunk);
+    }
+
+    console.log(`[Push] Sent to ${messages.length} devices`);
+  } catch (err: any) {
+    console.error('[Push] Error:', err.message);
+  }
+}
 
 // State in-memory untuk track status tiap device
 // Key: macAddress
@@ -227,6 +275,12 @@ async function handleSleep(macAddress: string, payload: MqttSleepPayload): Promi
         timestamp: alert.created_at,
         acknowledged: false,
       });
+      await sendPushNotification(
+    babyId,
+    '🚨 Peringatan Darurat!',
+    'Bayi terdeteksi posisi telungkup! Segera periksa.',
+    'critical'
+    );
     }
   }
 }
@@ -312,6 +366,14 @@ async function handleTemperature(
         timestamp: alert.created_at,
         acknowledged: false,
       });
+      await sendPushNotification(
+  babyId,
+  '⚠️ Perhatian Suhu',
+  isHigh
+    ? `Suhu terlalu tinggi: ${payload.temperature}°C`
+    : `Suhu terlalu rendah: ${payload.temperature}°C`,
+  'warning'
+);
     }
   }
 }
@@ -324,24 +386,43 @@ async function handleCrying(
   if (!babyId) return;
 
   const config = await deviceService.getDeviceConfig(macAddress);
-  const minDuration = config?.crying_min_duration_sec || 10;
+  const minDuration = config?.crying_min_duration_sec ?? 10;
 
-  // Skip jika durasi di bawah threshold
-  if (payload.isCrying && payload.durationSec < minDuration) return;
+  // Kalau ada audio buffer, forward ke AI server untuk klasifikasi
+  let isCrying = payload.isCrying;
+  let durationSec = payload.durationSec;
 
+  if (payload.audioBuffer && process.env.AI_SERVER_URL) {
+    try {
+      const aiResult = await axios.post<{ isCrying: boolean; durationSec?: number }>(
+        `${process.env.AI_SERVER_URL}/classify/audio`,
+        { audioBuffer: payload.audioBuffer, macAddress },
+        { timeout: 3000 }
+      );
+      isCrying = aiResult.data.isCrying;
+      durationSec = aiResult.data.durationSec ?? durationSec;
+    } catch {
+      // Kalau AI server tidak tersedia, pakai hasil dari ESP32 langsung
+      console.warn('[MQTT] AI server tidak tersedia, pakai hasil ESP32');
+    }
+  }
+
+  if (isCrying && durationSec < minDuration) return;
+
+  // Update state dan broadcast — sama seperti sebelumnya
   if (!deviceStateMap[macAddress]) {
     deviceStateMap[macAddress] = {
       temperature: 36.5,
       sleepPosition: 'unknown',
       positionConfidence: 0,
-      isCrying: payload.isCrying,
-      cryingDurationSec: payload.durationSec,
+      isCrying,
+      cryingDurationSec: durationSec,
       nightVisionActive: false,
       lastHeartbeat: Date.now(),
     };
   } else {
-    deviceStateMap[macAddress].isCrying = payload.isCrying;
-    deviceStateMap[macAddress].cryingDurationSec = payload.durationSec;
+    deviceStateMap[macAddress].isCrying = isCrying;
+    deviceStateMap[macAddress].cryingDurationSec = durationSec;
   }
 
   const state = deviceStateMap[macAddress];
@@ -350,13 +431,13 @@ async function handleCrying(
     sleepPosition: state.sleepPosition,
     positionConfidence: state.positionConfidence,
     temperature: state.temperature,
-    isCrying: payload.isCrying,
-    cryingDurationSec: payload.durationSec,
+    isCrying,
+    cryingDurationSec: durationSec,
     alertLevel: alertService.determineAlertLevel(
       state.sleepPosition,
       state.temperature,
-      config?.temp_min || 36.5,
-      config?.temp_max || 37.5
+      config?.temp_min ?? 36.5,
+      config?.temp_max ?? 37.5
     ),
     nightVisionActive: state.nightVisionActive,
   });
@@ -367,21 +448,20 @@ async function handleCrying(
       sleepPosition: state.sleepPosition,
       positionConfidence: state.positionConfidence,
       temperature: state.temperature,
-      isCrying: payload.isCrying,
-      cryingDurationSec: payload.durationSec,
-      alertLevel: 'warning',
+      isCrying,
+      cryingDurationSec: durationSec,
+      alertLevel: isCrying ? 'warning' : 'normal',
       nightVisionActive: state.nightVisionActive,
       deviceOnline: true,
       lastUpdated: payload.timestamp,
     });
   }
 
-  // Alert tangisan
-  if (payload.isCrying) {
+  if (isCrying) {
     const alert = await alertService.createAlert({
       babyId,
       type: 'CRYING_DETECTED',
-      message: `Bayi terdeteksi menangis selama ${payload.durationSec} detik`,
+      message: `Bayi terdeteksi menangis selama ${durationSec} detik`,
       severity: 'warning',
     });
 

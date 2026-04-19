@@ -2,7 +2,15 @@ import { supabaseAdmin } from '../config/supabase';
 import { generateUniqueCode } from '../utils/code-generator';
 
 export const babyService = {
-  // Ambil semua bayi dalam satu unit
+  async getBabyStreamUrl(babyId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from('devices')
+    .select('stream_url')
+    .eq('baby_id', babyId)
+    .single();
+
+  return data?.stream_url ?? null;
+},
   async getBabiesByUnit(unitId: string) {
     const { data, error } = await supabaseAdmin
       .from('babies')
