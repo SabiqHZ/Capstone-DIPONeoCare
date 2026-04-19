@@ -7,7 +7,6 @@ import morgan from 'morgan';
 import { env } from './config/env';
 import routes from './routes';
 import { initSocket } from './socket/socket.handler';
-import { initMqtt } from './services/mqtt.service';
 import { errorMiddleware } from './middleware/error.middleware';
 
 const app = express();
@@ -22,7 +21,6 @@ const io = new Server(httpServer, {
 });
 
 initSocket(io);
-initMqtt(io);
 
 // Middleware
 app.use(helmet());
