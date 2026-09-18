@@ -51,12 +51,10 @@ export const alertService = {
   },
 
   determineAlertLevel(
-    position: string,
     temperature: number,
     tempMin: number,
     tempMax: number
   ): AlertLevel {
-    if (position === 'prone') return 'critical';
     if (temperature > tempMax || temperature < tempMin) return 'warning';
     return 'normal';
   },

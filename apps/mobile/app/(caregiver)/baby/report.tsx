@@ -20,8 +20,9 @@ interface DailyReport {
   date: string;
   totalSleepMinutes: number;
   totalAwakeMinutes: number;
+  totalCryingMinutes: number;
   totalCryingEvents: number;
-  HourlyActivities: {
+  hourlyActivities: {
     hour: number;
     sleepMinutes: number;
     awakeMinutes: number;
@@ -155,9 +156,9 @@ export default function NurseBabyReportScreen() {
               </View>
               <View style={[styles.summaryCard, { backgroundColor: Colors.dangerLight }]}>
                 <Text style={[styles.summaryVal, { color: Colors.danger }]}>
-                  {report.totalCryingEvents}x
+                  {formatDuration(report.totalCryingMinutes)}
                 </Text>
-                <Text style={styles.summaryLabel}>Tangisan</Text>
+                <Text style={styles.summaryLabel}>Total Menangis</Text>
               </View>
             </View>
 

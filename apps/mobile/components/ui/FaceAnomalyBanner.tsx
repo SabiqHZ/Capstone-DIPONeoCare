@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Animated, useEffect, useRef } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Icon } from './Icon';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';

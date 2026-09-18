@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import { notificationService } from '../services/notification.service';
+import {
+  getNotificationsModule,
+  notificationService,
+} from '../services/notification.service';
 import { useAuthStore } from '../stores/auth.store';
 
 export function useNotifications() {
@@ -13,9 +16,14 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) return;
 
+    const Notifications = getNotificationsModule();
+    if (!Notifications) return;
+
+    let isActive = true;
+
     // Register dan simpan token
     notificationService.registerForPushNotifications().then((token) => {
-      if (token) {
+      if (isActive && token) {
         notificationService.saveTokenToBackend(token);
       }
     });
@@ -46,6 +54,7 @@ export function useNotifications() {
       });
 
     return () => {
+      isActive = false;
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };

@@ -27,26 +27,23 @@ export default function CameraScreen() {
 
   const babyId = user?.role === 'parent' ? user.babyId : null;
   const focusedStatus = babyId ? state.statuses[babyId] : null;
-  const isDeviceOnline = focusedStatus?.deviceOnline ?? false;
+  const isDeviceOnline = true;
   const nightVision = focusedStatus?.nightVisionActive ?? false;
 
   useEffect(() => {
-    if (!babyId) return;
-    fetchStreamUrl(babyId);
-  }, [babyId]);
+    fetchStreamUrlBypass();
+  }, []);
 
-  const fetchStreamUrl = async (id: string) => {
-    try {
-      setIsLoading(true);
-      setHasError(false);
-      const res = await api.get(`/babies/${id}/stream-url`);
-      const url = res.data.data?.streamUrl;
-      setStreamUrl(url ?? null);
-    } catch {
-      setHasError(true);
-    } finally {
+  const fetchStreamUrlBypass = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    
+    const esp32LocalUrl = 'http://10.76.65.127/stream'; 
+    
+    setTimeout(() => {
+      setStreamUrl(esp32LocalUrl);
       setIsLoading(false);
-    }
+    }, 500);
   };
 
   if (!babyId) return null;
@@ -124,7 +121,7 @@ export default function CameraScreen() {
             <Text style={styles.offlineText}>Gagal memuat stream</Text>
             <TouchableOpacity
               style={styles.retryBtn}
-              onPress={() => fetchStreamUrl(babyId)}
+              onPress={() => setStreamUrl(babyId)}
             >
               <Text style={styles.retryText}>Coba Lagi</Text>
             </TouchableOpacity>

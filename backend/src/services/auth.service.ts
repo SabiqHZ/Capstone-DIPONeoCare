@@ -46,7 +46,7 @@ export const authService = {
     const { data: baby, error } = await supabaseAdmin
       .from('babies')
       .select('id, name, unique_code')
-      .eq('unique_code', uniqueCode.toUpperCase())
+      .eq('unique_code', uniqueCode.trim().toUpperCase())
       .single();
 
     if (error || !baby) {

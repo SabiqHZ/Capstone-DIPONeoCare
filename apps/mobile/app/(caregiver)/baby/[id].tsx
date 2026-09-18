@@ -253,7 +253,9 @@ export default function BabyDetailScreen() {
                   <View style={[styles.aiCard, styles.normalCard]}>
                     <Icon name="body-outline" library="ionicons" size={24} color={Colors.primary} />
                     <Text style={styles.aiCardLabel}>Aktivitas</Text>
-                    <Text style={styles.aiCardValue}>{activity === 'sleeping' ? 'Tidur' : 'Bangun'}</Text>
+                    <Text style={styles.aiCardValue}>
+                      {activity === 'sleeping' ? 'Tidur' : activity === 'awake' ? 'Bangun' : 'Menangis'}
+                    </Text>
                   </View>
                 </View>
                 <Text style={styles.lastUpdated}>Diperbarui: {new Date(lastUpdated).toLocaleTimeString('id-ID')}</Text>

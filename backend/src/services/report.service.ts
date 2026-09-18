@@ -1,28 +1,29 @@
 import { supabaseAdmin } from '../config/supabase';
 
+interface ActivitySample {
+  sleeping: boolean;
+  awake: boolean;
+  crying: boolean;
+  recorded_at: string;
+}
+
+interface HourlyActivity {
+  hour: number;
+  sleepSeconds: number;
+  awakeSeconds: number;
+  cryingSeconds: number;
+}
+
 export const reportService = {
+  // Laporan selalu dihitung dari sampel AI mentah agar data terbaru langsung terlihat.
   async getDailyReport(babyId: string, date: string) {
-    // Cek apakah laporan sudah ada
-    const { data: existing } = await supabaseAdmin
-      .from('daily_reports')
-      .select('*')
-      .eq('baby_id', babyId)
-      .eq('date', date)
-      .single();
-
-    if (existing) {
-      return mapReport(existing);
-    }
-
-    // Kalau belum ada, generate dari alert_logs dan baby_statuses
-    const generated = await generateDailyReport(babyId, date);
-    return generated;
+    return buildDailyReport(babyId, date);
   },
 
   async getReportList(babyId: string, limit = 7) {
     const { data, error } = await supabaseAdmin
       .from('daily_reports')
-      .select('date, total_prone_events, avg_temperature, total_crying_events')
+      .select('date, total_sleep_minutes, total_awake_minutes, total_crying_events')
       .eq('baby_id', babyId)
       .order('date', { ascending: false })
       .limit(limit);
@@ -32,79 +33,82 @@ export const reportService = {
   },
 };
 
-// ── Helper: generate laporan dari data mentah ─────────────────────────
+async function buildDailyReport(babyId: string, date: string) {
+  const startOfDay = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(startOfDay.getTime())) throw new Error('Format tanggal tidak valid');
 
-async function generateDailyReport(babyId: string, date: string) {
-  // Ambil alert logs untuk hari ini
-  const startOfDay = `${date}T00:00:00Z`;
-  const endOfDay = `${date}T23:59:59Z`;
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
 
-  const { data: alerts } = await supabaseAdmin
-    .from('alert_logs')
-    .select('type, severity, created_at')
+  const { data, error } = await supabaseAdmin
+    .from('baby_activity_samples')
+    .select('sleeping, awake, crying, recorded_at')
     .eq('baby_id', babyId)
-    .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay);
+    .gte('recorded_at', startOfDay.toISOString())
+    .lt('recorded_at', endOfDay.toISOString())
+    .order('recorded_at', { ascending: true });
 
-  const proneEvents = alerts?.filter((a) => a.type === 'PRONE_POSITION').length ?? 0;
-  const cryingEvents = alerts?.filter((a) => a.type === 'CRYING_DETECTED').length ?? 0;
+  if (error) throw new Error(error.message);
 
-  // Ambil status terbaru sebagai referensi suhu
-  const { data: status } = await supabaseAdmin
-    .from('baby_statuses')
-    .select('temperature')
-    .eq('baby_id', babyId)
-    .single();
+  const hourlyActivities: HourlyActivity[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    sleepSeconds: 0,
+    awakeSeconds: 0,
+    cryingSeconds: 0,
+  }));
 
-  const avgTemp = status?.temperature ?? 0;
+  let cryingEvents = 0;
+  let previousCryingAt: number | null = null;
 
-  // Build hourly positions dari alert logs (simulasi)
-  const hourlyPositions = buildHourlyPositions(alerts ?? []);
+  for (const sample of (data ?? []) as ActivitySample[]) {
+    const recordedAt = new Date(sample.recorded_at);
+    const hour = recordedAt.getUTCHours();
+    const hourly = hourlyActivities[hour];
+
+    if (sample.sleeping) hourly.sleepSeconds += 1;
+    if (sample.awake) hourly.awakeSeconds += 1;
+    if (sample.crying) {
+      hourly.cryingSeconds += 1;
+
+      // Tangisan baru dihitung ketika status sebelumnya bukan menangis
+      // atau terdapat jeda lebih dari satu detik antar sampel.
+      if (previousCryingAt === null || recordedAt.getTime() - previousCryingAt > 1_500) {
+        cryingEvents += 1;
+      }
+      previousCryingAt = recordedAt.getTime();
+    } else {
+      previousCryingAt = null;
+    }
+  }
+
+  const totals = hourlyActivities.reduce(
+    (sum, hour) => ({
+      sleepSeconds: sum.sleepSeconds + hour.sleepSeconds,
+      awakeSeconds: sum.awakeSeconds + hour.awakeSeconds,
+      cryingSeconds: sum.cryingSeconds + hour.cryingSeconds,
+    }),
+    { sleepSeconds: 0, awakeSeconds: 0, cryingSeconds: 0 }
+  );
 
   return {
     babyId,
     date,
-    totalProneEvents: proneEvents,
-    avgTemperature: avgTemp,
-    maxTemperature: avgTemp + 0.3,
-    minTemperature: avgTemp - 0.3,
+    totalSleepSeconds: totals.sleepSeconds,
+    totalAwakeSeconds: totals.awakeSeconds,
+    totalCryingSeconds: totals.cryingSeconds,
+    totalSleepMinutes: secondsToMinutes(totals.sleepSeconds),
+    totalAwakeMinutes: secondsToMinutes(totals.awakeSeconds),
+    totalCryingMinutes: secondsToMinutes(totals.cryingSeconds),
     totalCryingEvents: cryingEvents,
-    hourlyPositions,
-    temperatureTimeline: [],
+    hourlyActivities: hourlyActivities.map((hour) => ({
+      ...hour,
+      sleepMinutes: secondsToMinutes(hour.sleepSeconds),
+      awakeMinutes: secondsToMinutes(hour.awakeSeconds),
+      cryingMinutes: secondsToMinutes(hour.cryingSeconds),
+    })),
   };
 }
 
-function buildHourlyPositions(alerts: any[]) {
-  const hours = Array.from({ length: 24 }, (_, i) => ({
-    hour: i,
-    supine: 50,
-    prone: 0,
-    lateral: 0,
-  }));
-
-  alerts
-    .filter((a) => a.type === 'PRONE_POSITION')
-    .forEach((a) => {
-      const hour = new Date(a.created_at).getHours();
-      if (hours[hour]) {
-        hours[hour].prone += 10;
-        hours[hour].supine = Math.max(0, hours[hour].supine - 10);
-      }
-    });
-
-  return hours;
-}
-
-function mapReport(data: any) {
-  return {
-    babyId: data.baby_id,
-    date: data.date,
-    totalProneEvents: data.total_prone_events,
-    avgTemperature: parseFloat(data.avg_temperature),
-    maxTemperature: parseFloat(data.max_temperature),
-    minTemperature: parseFloat(data.min_temperature),
-    totalCryingEvents: data.total_crying_events,
-    hourlyPositions: data.hourly_positions ?? [],
-    temperatureTimeline: data.temperature_timeline ?? [],
-  };
+function secondsToMinutes(seconds: number): number {
+  return Number((seconds / 60).toFixed(2));
 }

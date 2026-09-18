@@ -77,14 +77,23 @@ export interface AlertNotification {
 
 export interface HourlyActivityData {
   hour: number;
-  awake: number;
-  sleeping: number;
-  crying: number;
+  sleepSeconds: number;
+  awakeSeconds: number;
+  cryingSeconds: number;
+  awakeMinutes: number;
+  sleepMinutes: number;
+  cryingMinutes: number;
 }
 
 export interface DailyReport {
   babyId: string;
   date: string;
+  totalAwakeMinutes: number;
+  totalSleepMinutes: number;
+  totalAwakeSeconds: number;
+  totalSleepSeconds: number;
+  totalCryingMinutes: number;
+  totalCryingSeconds: number;
   totalCryingEvents: number;
   hourlyActivities: HourlyActivityData[];
 }

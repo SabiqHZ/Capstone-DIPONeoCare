@@ -18,7 +18,7 @@ export const babyService = {
         id, name, bed_number, date_of_birth, parent_name,
         unique_code, unit_id, created_at,
         baby_statuses (
-          sleep_position, position_confidence, temperature,
+          activity, is_sleeping, is_awake, temperature,
           is_crying, crying_duration_sec, alert_level,
           night_vision_active, updated_at
         ),

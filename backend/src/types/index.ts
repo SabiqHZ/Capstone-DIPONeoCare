@@ -15,8 +15,14 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
-export type SleepPosition = 'supine' | 'prone' | 'lateral' | 'unknown';
+export type BabyActivity = 'sleeping' | 'awake' | 'crying';
 export type AlertLevel = 'normal' | 'warning' | 'critical';
+
+export interface ActivityFlags {
+  sleeping: boolean;
+  awake: boolean;
+  crying: boolean;
+}
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -26,11 +32,14 @@ export interface ApiResponse<T = unknown> {
 }
 // ── MQTT Payloads dari ESP32 ──────────────────────────────────────
 
-export interface MqttSleepPayload {
+export interface MqttActivityPayload {
   deviceId: string;
   macAddress: string;
-  position: SleepPosition;
+  sleeping: boolean;
+  awake: boolean;
+  crying: boolean;
   confidence: number;
+  durationSec?: number;
   nightVision: boolean;
   timestamp: string;
 }
@@ -39,14 +48,6 @@ export interface MqttTemperaturePayload {
   deviceId: string;
   macAddress: string;
   temperature: number;
-  timestamp: string;
-}
-
-export interface MqttCryingPayload {
-  deviceId: string;
-  macAddress: string;
-  isCrying: boolean;
-  durationSec: number;
   timestamp: string;
 }
 

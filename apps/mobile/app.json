@@ -7,24 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "extra": {
-        "eas": {
-          "projectId": "f8b3dee9-6cc9-49a6-8a28-737be8b5f569"
-        }
-      }
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.smartvision.mobile",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ],
+        "UIBackgroundModes": ["remote-notification"],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
@@ -32,7 +19,6 @@
       }
     },
     "android": {
-      
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1D9E75"
@@ -43,8 +29,6 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "usesCleartextTraffic": true,
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -66,7 +50,17 @@
           "color": "#1D9E75",
           "sounds": []
         }
-      ]
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "router": {},
