@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Icon } from '../ui/Icon';
-import { BabyActivity, SoundClass } from '../../types';
+import { BabyActivity, FaceAnomaly, SoundClass } from '../../types';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
 
@@ -9,7 +9,7 @@ interface Props {
   soundClass: SoundClass;
   soundConfidence: number;
   nightVision: boolean;
-  faceAnomaly?: 'face_covered' | 'none';
+  faceAnomaly?: FaceAnomaly;
 }
 
 const activityConfig = {
@@ -108,7 +108,7 @@ export function ActivityCard({
       </View>
 
       {/* Alert strip */}
-      {faceAnomaly === 'face_covered' ? (
+      {faceAnomaly && faceAnomaly !== 'none' ? (
         <View style={styles.alertStrip}>
           <Icon
             name="alert-circle"
@@ -117,7 +117,7 @@ export function ActivityCard({
             color={Colors.white}
           />
           <Text style={styles.alertText}>
-            Perlu perhatian — wajah bayi tertutup
+            Perlu perhatian — {faceAnomaly} terdeteksi di area bayi
           </Text>
         </View>
       ) : null}

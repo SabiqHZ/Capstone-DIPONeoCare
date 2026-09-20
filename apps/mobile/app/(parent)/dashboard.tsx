@@ -69,7 +69,7 @@ export default function ParentDashboard() {
   }, [babyId, setFocused, fetchBabyProfile]);
 
   useEffect(() => {
-    if (status?.faceAnomaly === 'face_covered') {
+    if (status?.faceAnomaly && status.faceAnomaly !== 'none') {
       setFaceAnomalyDismissed(false);
     }
   }, [status?.faceAnomaly, status?.lastUpdated]);
@@ -81,7 +81,7 @@ export default function ParentDashboard() {
 
   if (!babyId) return null;
 
-  const showFaceAnomaly = status?.faceAnomaly === 'face_covered' && !faceAnomalyDismissed;
+  const showFaceAnomaly = Boolean(status?.faceAnomaly && status.faceAnomaly !== 'none' && !faceAnomalyDismissed);
   const visibleAlerts = alerts.slice(0, 3);
 
   return (

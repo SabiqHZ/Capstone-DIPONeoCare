@@ -64,7 +64,7 @@ function BabyCard({ baby, onPress }: { baby: BabyWithStatus; onPress: () => void
   const isOnline = activeStatus ? activeStatus.deviceOnline : (baby.devices?.is_online ?? false);
   const isCrying = activeStatus ? activeStatus.isCrying : (baby.baby_statuses?.is_crying ?? false);
   const activity = activeStatus ? activeStatus.activity : (baby.baby_statuses?.activity ?? 'sleeping');
-  const faceCovered = activeStatus ? activeStatus.faceAnomaly === 'face_covered' : (baby.baby_statuses?.face_anomaly === 'face_covered');
+  const faceCovered = activeStatus ? activeStatus.faceAnomaly !== 'none' : Boolean(baby.baby_statuses?.face_anomaly && baby.baby_statuses.face_anomaly !== 'none');
   const nvActive = activeStatus ? activeStatus.nightVisionActive : (baby.baby_statuses?.night_vision_active ?? false);
   const cryingSec = activeStatus ? activeStatus.cryingDurationSec : (baby.baby_statuses?.crying_duration_sec ?? 0);
 
@@ -191,7 +191,7 @@ export default function NurseDashboard() {
     babies.forEach(baby => {
       const rtStatus = realtimeStatuses[baby.id];
       const isCry = rtStatus ? rtStatus.isCrying : (baby.baby_statuses?.is_crying ?? false);
-      const isFace = rtStatus ? (rtStatus.faceAnomaly === 'face_covered') : (baby.baby_statuses?.face_anomaly === 'face_covered');
+      const isFace = rtStatus ? rtStatus.faceAnomaly !== 'none' : Boolean(baby.baby_statuses?.face_anomaly && baby.baby_statuses.face_anomaly !== 'none');
       const isOn = rtStatus ? rtStatus.deviceOnline : (baby.devices?.is_online ?? false);
 
       if (isCry) cry++;

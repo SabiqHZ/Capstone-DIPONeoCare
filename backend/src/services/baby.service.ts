@@ -18,9 +18,10 @@ export const babyService = {
         id, name, bed_number, date_of_birth, parent_name,
         unique_code, unit_id, created_at,
         baby_statuses (
-          activity, is_sleeping, is_awake, temperature,
+          activity, is_sleeping, is_awake,
           is_crying, crying_duration_sec, alert_level,
-          night_vision_active, updated_at
+          night_vision_active, sound_class, sound_confidence,
+          face_anomaly, face_detected, body_detected, updated_at
         ),
         devices (
           id, mac_address, is_online, last_heartbeat
@@ -105,9 +106,16 @@ export const babyService = {
 
   // Pairing device ke bayi
   async pairDevice(babyId: string, deviceId: string) {
+    const { data: baby, error: babyError } = await supabaseAdmin
+      .from('babies')
+      .select('unit_id')
+      .eq('id', babyId)
+      .single();
+    if (babyError) throw new Error(babyError.message);
+
     const { error } = await supabaseAdmin
       .from('devices')
-      .update({ baby_id: babyId })
+      .update({ baby_id: babyId, unit_id: baby.unit_id })
       .eq('id', deviceId);
 
     if (error) throw new Error(error.message);

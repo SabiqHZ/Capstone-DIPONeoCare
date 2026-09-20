@@ -17,9 +17,9 @@ export function FaceAnomalyBanner({ visible, onDismiss }: Props) {
         <Icon name="eye-off-outline" library="ionicons" size={22} color="#fff" />
       </View>
       <View style={styles.textBox}>
-        <Text style={styles.title}>Wajah Bayi Tidak Terdeteksi</Text>
+        <Text style={styles.title}>Objek Anomali Terdeteksi</Text>
         <Text style={styles.sub}>
-          Kemungkinan ada objek yang menutupi wajah bayi. Segera periksa!
+          Ada objek di area bayi. Segera periksa kondisi bayi!
         </Text>
       </View>
       <TouchableOpacity onPress={onDismiss} style={styles.dismissBtn}>

@@ -30,35 +30,40 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   error?: string;
 }
-// ── MQTT Payloads dari ESP32 ──────────────────────────────────────
-
-export interface MqttActivityPayload {
-  deviceId: string;
-  macAddress: string;
-  sleeping: boolean;
-  awake: boolean;
-  crying: boolean;
-  confidence: number;
-  durationSec?: number;
-  nightVision: boolean;
-  timestamp: string;
+export interface DeviceContext {
+  id: string;
+  mac_address: string;
+  baby_id: string | null;
+  unit_id: string | null;
+  is_online: boolean;
+  crying_min_duration_sec: number | null;
+  notification_cooldown_sec: number | null;
 }
 
-export interface MqttTemperaturePayload {
-  deviceId: string;
+export interface VisionResultPayload {
   macAddress: string;
-  temperature: number;
+  captureId: string;
   timestamp: string;
+  activity: {
+    sleeping: boolean;
+    awake: boolean;
+    confidence?: number;
+  };
+  visualCrying: {
+    detected: boolean;
+    confidence?: number;
+  };
+  anomaly: {
+    detected: boolean;
+    type: 'pillow' | 'bolster' | 'toy' | null;
+    confidence?: number;
+  };
+  nightVision?: boolean;
 }
 
-export interface MqttHeartbeatPayload {
-  deviceId: string;
-  macAddress: string;
+export interface AudioSecondResult {
+  captureId: string;
   timestamp: string;
-}
-
-export interface MqttDeviceRegisterPayload {
-  macAddress: string;
-  firmwareVersion: string;
-  timestamp: string;
+  isCrying: boolean;
+  confidence?: number;
 }

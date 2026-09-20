@@ -21,7 +21,7 @@ export type AuthUser = CaregiverUser | ParentUser;
 export type BabyActivity = 'awake' | 'sleeping' | 'crying';
 export type SoundClass = 'crying' | 'not_crying';
 export type AlertLevel = 'normal' | 'warning';
-export type FaceAnomaly = 'face_covered' | 'none';
+export type FaceAnomaly = 'pillow' | 'bolster' | 'toy' | 'none';
 
 export interface BabyStatus {
   babyId: string;

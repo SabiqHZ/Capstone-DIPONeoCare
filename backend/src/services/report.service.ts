@@ -34,7 +34,8 @@ export const reportService = {
 };
 
 async function buildDailyReport(babyId: string, date: string) {
-  const startOfDay = new Date(`${date}T00:00:00.000Z`);
+  // Day boundaries and the hourly report follow the daycare's local timezone.
+  const startOfDay = new Date(`${date}T00:00:00.000+07:00`);
   if (Number.isNaN(startOfDay.getTime())) throw new Error('Format tanggal tidak valid');
 
   const endOfDay = new Date(startOfDay);
@@ -62,7 +63,7 @@ async function buildDailyReport(babyId: string, date: string) {
 
   for (const sample of (data ?? []) as ActivitySample[]) {
     const recordedAt = new Date(sample.recorded_at);
-    const hour = recordedAt.getUTCHours();
+    const hour = (recordedAt.getUTCHours() + 7) % 24;
     const hourly = hourlyActivities[hour];
 
     if (sample.sleeping) hourly.sleepSeconds += 1;

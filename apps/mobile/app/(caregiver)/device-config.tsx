@@ -13,6 +13,7 @@ import { Icon } from '../../components/ui/Icon';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
 import { DeviceConfig } from '../../types';
+import api from '../../services/api';
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: 'SV-DEMO01',
@@ -105,9 +106,17 @@ export default function DeviceConfigScreen() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setIsSaving(false);
-    Alert.alert('Berhasil', 'Konfigurasi perangkat berhasil disimpan.');
+    try {
+      await api.patch(`/devices/${config.deviceId}/config`, {
+        cryingMinDurationSec: config.cryingMinDurationSec,
+        notificationCooldownSec: config.notificationCooldownSec,
+      });
+      Alert.alert('Berhasil', 'Konfigurasi perangkat berhasil disimpan.');
+    } catch (error: any) {
+      Alert.alert('Gagal', error.response?.data?.error || 'Konfigurasi perangkat tidak dapat disimpan.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
