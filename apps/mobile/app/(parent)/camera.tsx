@@ -62,6 +62,11 @@ export default function CameraScreen() {
 
   const anomalyType = focusedStatus?.faceAnomaly ?? "none";
   const hasAnomaly = anomalyType !== "none";
+  // MJPEG is an image stream, so render it inside an HTML image element rather
+  // than asking the WebView to navigate to the raw multipart response.
+  const streamHtml = streamUrl
+    ? `<!doctype html><html><body style="margin:0;background:#111827;display:flex;align-items:center;justify-content:center;height:100vh"><img src=${JSON.stringify(streamUrl)} style="width:100%;height:100%;object-fit:contain" /></body></html>`
+    : "";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -155,12 +160,13 @@ export default function CameraScreen() {
           </View>
         ) : (
           <WebView
-            source={{ uri: streamUrl }}
+            source={{ html: streamHtml }}
             style={styles.webview}
             scrollEnabled={false}
             bounces={false}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
+            mixedContentMode="always"
             onError={() => setHasError(true)}
             onHttpError={() => setHasError(true)}
             renderLoading={() => (

@@ -40,6 +40,7 @@ interface BabyDetail {
     name: string;
     is_online: boolean;
     last_heartbeat: string | null;
+    local_ip: string | null;
     stream_url: string | null;
     crying_min_duration_sec: number;
     notification_cooldown_sec: number;
@@ -175,12 +176,20 @@ export default function BabyDetailScreen() {
     ? realtimeStatus.lastUpdated
     : (baby.baby_statuses?.updated_at ?? new Date().toISOString());
 
-  // HTML Wrapper untuk MJPEG agar tidak crash di iOS
-  const streamUrl = baby.devices?.stream_url || "http://192.168.1.17/stream";
+  // IP perangkat diperbarui saat register/heartbeat. Endpoint MJPEG selalu /stream.
+  const deviceAddress = baby.devices?.local_ip?.trim();
+  const streamBaseUrl = deviceAddress
+    ? (/^https?:\/\//i.test(deviceAddress)
+        ? deviceAddress
+        : `http://${deviceAddress}`)
+    : null;
+  const streamUrl = streamBaseUrl
+    ? `${streamBaseUrl.replace(/\/+$/, "")}/stream`
+    : baby.devices?.stream_url ?? null;
   const htmlContent = `
     <html>
       <body style="margin:0;padding:0;background-color:#111827;display:flex;justify-content:center;align-items:center;">
-        <img src="${streamUrl}" style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'" />
+        <img src=${JSON.stringify(streamUrl ?? "")} style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'" />
       </body>
     </html>
   `;
@@ -290,11 +299,13 @@ export default function BabyDetailScreen() {
           </View>
         ) : (
           <>
-            {!isDeviceOnline ? (
+            {!isDeviceOnline || !streamUrl ? (
               <View style={styles.waitingBox}>
                 <ActivityIndicator color={Colors.secondary} size="large" />
                 <Text style={styles.waitingText}>
-                  Menunggu koneksi kamera...
+                  {!streamUrl
+                    ? "Menunggu IP kamera terdaftar..."
+                    : "Menunggu koneksi kamera..."}
                 </Text>
                 <Text style={styles.offlineText}>
                   Terakhir online:{" "}
@@ -314,6 +325,7 @@ export default function BabyDetailScreen() {
                     style={styles.cameraStream}
                     scrollEnabled={false}
                     bounces={false}
+                    mixedContentMode="always"
                     showsHorizontalScrollIndicator={false}
                     showsVerticalScrollIndicator={false}
                   />

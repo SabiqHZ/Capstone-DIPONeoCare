@@ -3,14 +3,27 @@ import { generateUniqueCode } from '../utils/code-generator';
 
 export const babyService = {
   async getBabyStreamUrl(babyId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin
-    .from('devices')
-    .select('stream_url')
-    .eq('baby_id', babyId)
-    .single();
+    const { data, error } = await supabaseAdmin
+      .from('devices')
+      .select('local_ip, stream_url')
+      .eq('baby_id', babyId)
+      .maybeSingle();
 
-  return data?.stream_url ?? null;
-},
+    if (error) throw new Error(error.message);
+
+    // The ESP32 reports its current LAN address in every heartbeat. Build the
+    // MJPEG endpoint here instead of keeping a stale, manually configured URL.
+    const deviceAddress = data?.local_ip?.trim();
+    if (deviceAddress) {
+      const baseUrl = /^https?:\/\//i.test(deviceAddress)
+        ? deviceAddress
+        : `http://${deviceAddress}`;
+      return `${baseUrl.replace(/\/+$/, '')}/stream`;
+    }
+
+    // Preserve compatibility for devices registered before local_ip existed.
+    return data?.stream_url ?? null;
+  },
   async getBabiesByUnit(unitId: string) {
     const { data, error } = await supabaseAdmin
       .from('babies')

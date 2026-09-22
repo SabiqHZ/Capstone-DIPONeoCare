@@ -1,4 +1,4 @@
-const DEV_IP = process.env.EXPO_PUBLIC_DEV_IP || "192.168.1.15";
+const DEV_IP = process.env.EXPO_PUBLIC_DEV_IP || "172.20.10.13";
 
 export const CONFIG = {
   API_URL: __DEV__
