@@ -1,15 +1,13 @@
 {
-  "name": "simulator",
+  "name": "diponeocare-http-simulator",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "HTTP simulator for the ESP32-S3 device contract used by DIPONeoCare / Smart Vision",
+  "main": "esp32-http-simulator.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node esp32-http-simulator.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "mqtt": "^5.15.1"
+  "engines": {
+    "node": ">=18"
   }
 }

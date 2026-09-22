@@ -1,7 +1,7 @@
-export type UserRole = 'caregiver' | 'parent';
+export type UserRole = "caregiver" | "parent";
 
 export interface CaregiverUser {
-  role: 'caregiver';
+  role: "caregiver";
   id: string;
   name: string;
   unitId: string;
@@ -9,7 +9,7 @@ export interface CaregiverUser {
 }
 
 export interface ParentUser {
-  role: 'parent';
+  role: "parent";
   babyId: string;
   babyName: string;
   uniqueCode: string;
@@ -18,10 +18,10 @@ export interface ParentUser {
 
 export type AuthUser = CaregiverUser | ParentUser;
 
-export type BabyActivity = 'awake' | 'sleeping' | 'crying';
-export type SoundClass = 'crying' | 'not_crying';
-export type AlertLevel = 'normal' | 'warning';
-export type FaceAnomaly = 'pillow' | 'bolster' | 'toy' | 'none';
+export type BabyActivity = "awake" | "sleeping" | "crying";
+export type SoundClass = "crying" | "not_crying";
+export type AlertLevel = "normal" | "warning";
+export type FaceAnomaly = "bantal" | "guling" | "mainan" | "none";
 
 export interface BabyStatus {
   babyId: string;
@@ -36,7 +36,7 @@ export interface BabyStatus {
   activity: BabyActivity;
   soundClass: SoundClass;
   soundConfidence: number;
-    faceAnomaly?: FaceAnomaly;
+  faceAnomaly?: FaceAnomaly;
   faceDetected?: boolean;
   bodyDetected?: boolean;
 }
@@ -60,9 +60,9 @@ export interface DeviceConfig {
 }
 
 export type NotificationType =
-  | 'CRYING_DETECTED'
-  | 'DEVICE_OFFLINE'
-  | 'FACE_COVERED';
+  | "CRYING_DETECTED"
+  | "DEVICE_OFFLINE"
+  | "FACE_COVERED";
 
 export interface AlertNotification {
   id: string;
@@ -70,7 +70,7 @@ export interface AlertNotification {
   babyName: string;
   type: NotificationType;
   message: string;
-  severity: 'warning' | 'critical';
+  severity: "warning" | "critical";
   timestamp: string;
   acknowledged: boolean;
 }

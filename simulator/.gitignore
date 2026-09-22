@@ -1,0 +1,4 @@
+node_modules/
+.device-state.json
+.samples/
+*.log

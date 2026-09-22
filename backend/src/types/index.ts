@@ -1,12 +1,12 @@
-import { Request } from 'express';
+import { Request } from "express";
 
-export type UserRole = 'nurse' | 'parent';
+export type UserRole = "nurse" | "parent";
 
 export interface JwtPayload {
-  sub: string;         // user id
+  sub: string; // user id
   role: UserRole;
-  unitId?: string;     // untuk nurse
-  babyId?: string;     // untuk parent
+  unitId?: string; // untuk nurse
+  babyId?: string; // untuk parent
   iat?: number;
   exp?: number;
 }
@@ -15,8 +15,8 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
-export type BabyActivity = 'sleeping' | 'awake' | 'crying';
-export type AlertLevel = 'normal' | 'warning' | 'critical';
+export type BabyActivity = "sleeping" | "awake" | "crying";
+export type AlertLevel = "normal" | "warning" | "critical";
 
 export interface ActivityFlags {
   sleeping: boolean;
@@ -55,10 +55,9 @@ export interface VisionResultPayload {
   };
   anomaly: {
     detected: boolean;
-    type: 'pillow' | 'bolster' | 'toy' | null;
+    type: "pillow" | "bolster" | "toy" | null;
     confidence?: number;
   };
-  nightVision?: boolean;
 }
 
 export interface AudioSecondResult {
