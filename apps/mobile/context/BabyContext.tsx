@@ -28,7 +28,10 @@ const initialState: BabyState = {
 
 // ── Actions ───────────────────────────────────────────────────────────
 type BabyAction =
-  | { type: "SET_STATUS"; payload: Partial<BabyStatus> & Pick<BabyStatus, "babyId"> }
+  | {
+      type: "SET_STATUS";
+      payload: Partial<BabyStatus> & Pick<BabyStatus, "babyId">;
+    }
   | { type: "ADD_ALERT"; payload: AlertNotification }
   | { type: "ACK_ALERT"; payload: string }
   | { type: "SET_FOCUSED"; payload: string }
@@ -123,11 +126,14 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    socketInstance.on("baby:status-update", (data: Partial<BabyStatus> & Pick<BabyStatus, "babyId">) => {
-      // Jika data dari backend berupa snake_case, backend harus memetakan ke camelCase
-      // sebelum melakukan emit. Kita asumsikan data sudah berformat interface BabyStatus.
-      dispatchRef.current({ type: "SET_STATUS", payload: data });
-    });
+    socketInstance.on(
+      "baby:status-update",
+      (data: Partial<BabyStatus> & Pick<BabyStatus, "babyId">) => {
+        // Jika data dari backend berupa snake_case, backend harus memetakan ke camelCase
+        // sebelum melakukan emit. Kita asumsikan data sudah berformat interface BabyStatus.
+        dispatchRef.current({ type: "SET_STATUS", payload: data });
+      },
+    );
 
     socketInstance.on("baby:alert", (data: AlertNotification) => {
       dispatchRef.current({ type: "ADD_ALERT", payload: data });
@@ -196,7 +202,6 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
         alertLevel: statusData.alert_level ?? "normal",
         deviceOnline: deviceData.is_online ?? false,
         lastUpdated: statusData.updated_at || new Date().toISOString(),
-        nightVisionActive: statusData.night_vision_active ?? false,
         activity: statusData.activity ?? "sleeping",
         soundClass: statusData.sound_class ?? "not_crying",
         soundConfidence: Number(statusData.sound_confidence) || 1,

@@ -32,7 +32,6 @@ export interface BabyStatus {
   alertLevel: AlertLevel;
   deviceOnline: boolean;
   lastUpdated: string;
-  nightVisionActive: boolean;
   activity: BabyActivity;
   soundClass: SoundClass;
   soundConfidence: number;

@@ -55,7 +55,7 @@ export interface VisionResultPayload {
   };
   anomaly: {
     detected: boolean;
-    type: "pillow" | "bolster" | "toy" | null;
+    type: "bantal" | "guling" | "mainan" | null;
     confidence?: number;
   };
 }

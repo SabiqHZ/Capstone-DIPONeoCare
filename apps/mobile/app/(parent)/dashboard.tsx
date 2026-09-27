@@ -1,26 +1,26 @@
-import { useEffect, useState, useCallback } from 'react';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
-import { useAuthStore } from '../../stores/auth.store';
+} from "react-native";
+import { useRouter } from "expo-router";
+import Svg, { Path } from "react-native-svg";
+import { useAuthStore } from "../../stores/auth.store";
 import {
   useBabyContext,
   useFocusedBabyStatus,
   useActiveAlerts,
-} from '../../context/BabyContext';
-import { babyService } from '../../services/baby.service';
-import { ActivityCard } from '../../components/baby/ActivityCard';
-import { AlertBanner } from '../../components/ui/AlertBanner';
-import { FaceAnomalyBanner } from '@/components/ui/FaceAnomalyBanner';
+} from "../../context/BabyContext";
+import { babyService } from "../../services/baby.service";
+import { ActivityCard } from "../../components/baby/ActivityCard";
+import { AlertBanner } from "../../components/ui/AlertBanner";
+import { FaceAnomalyBanner } from "@/components/ui/FaceAnomalyBanner";
 
 interface BabyProfile {
   id: string;
@@ -38,14 +38,18 @@ export default function ParentDashboard() {
   const { setFocused, acknowledgeAlert } = useBabyContext();
   const status = useFocusedBabyStatus();
   const alerts = useActiveAlerts();
-  
+
   const [babyProfile, setBabyProfile] = useState<BabyProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [faceAnomalyDismissed, setFaceAnomalyDismissed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const babyName = useAuthStore((s) => s.user?.role === 'parent' ? s.user.babyName : '');
-  const babyId = useAuthStore((s) => s.user?.role === 'parent' ? s.user.babyId : '');
+  const babyName = useAuthStore((s) =>
+    s.user?.role === "parent" ? s.user.babyName : "",
+  );
+  const babyId = useAuthStore((s) =>
+    s.user?.role === "parent" ? s.user.babyId : "",
+  );
   const logout = useAuthStore((s) => s.logout);
 
   const fetchBabyProfile = useCallback(async () => {
@@ -55,7 +59,7 @@ export default function ParentDashboard() {
       const res = await babyService.getBabyById(babyId);
       setBabyProfile(res as BabyProfile);
     } catch (err) {
-      console.error('[Dashboard] Gagal memuat profil identitas bayi:', err);
+      console.error("[Dashboard] Gagal memuat profil identitas bayi:", err);
     } finally {
       setIsProfileLoading(false);
     }
@@ -69,19 +73,23 @@ export default function ParentDashboard() {
   }, [babyId, setFocused, fetchBabyProfile]);
 
   useEffect(() => {
-    if (status?.faceAnomaly && status.faceAnomaly !== 'none') {
+    if (status?.faceAnomaly && status.faceAnomaly !== "none") {
       setFaceAnomalyDismissed(false);
     }
   }, [status?.faceAnomaly, status?.lastUpdated]);
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/(auth)/code-entry');
+    router.replace("/(auth)/code-entry");
   };
 
   if (!babyId) return null;
 
-  const showFaceAnomaly = Boolean(status?.faceAnomaly && status.faceAnomaly !== 'none' && !faceAnomalyDismissed);
+  const showFaceAnomaly = Boolean(
+    status?.faceAnomaly &&
+    status.faceAnomaly !== "none" &&
+    !faceAnomalyDismissed,
+  );
   const visibleAlerts = alerts.slice(0, 3);
 
   return (
@@ -97,28 +105,37 @@ export default function ParentDashboard() {
             <Text style={styles.greeting}>Halo, Orang Tua</Text>
             <Text style={styles.babyName}>{babyName || babyProfile?.name}</Text>
           </View>
-          
+
           <View style={styles.headerRight}>
-            <View style={[
-              styles.badge,
-              { backgroundColor: status?.deviceOnline ? '#052e16' : '#1f0a0a' },
-            ]}>
-              <View style={[
-                styles.badgeDot,
-                { backgroundColor: status?.deviceOnline ? '#4ade80' : '#f87171' },
-              ]} />
-              <Text style={[
-                styles.badgeText,
-                { color: status?.deviceOnline ? '#4ade80' : '#f87171' },
-              ]}>
-                {status?.deviceOnline ? 'Online' : 'Offline'}
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: status?.deviceOnline ? "#052e16" : "#1f0a0a",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.badgeDot,
+                  {
+                    backgroundColor: status?.deviceOnline
+                      ? "#4ade80"
+                      : "#f87171",
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.badgeText,
+                  { color: status?.deviceOnline ? "#4ade80" : "#f87171" },
+                ]}
+              >
+                {status?.deviceOnline ? "Online" : "Offline"}
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.logoutBtn}
-              onPress={handleLogout}
-            >
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <Text style={styles.logoutText}>Keluar</Text>
             </TouchableOpacity>
           </View>
@@ -130,7 +147,7 @@ export default function ParentDashboard() {
             key={a.id}
             message={a.message}
             severity={a.severity}
-            time={new Date(a.timestamp).toLocaleTimeString('id-ID')}
+            time={new Date(a.timestamp).toLocaleTimeString("id-ID")}
             onDismiss={() => acknowledgeAlert(a.id)}
           />
         ))}
@@ -150,29 +167,32 @@ export default function ParentDashboard() {
           <View style={styles.identityCard}>
             <Text style={styles.cardTitle}>Data Identitas Pasien Bayi</Text>
             <View style={styles.divider} />
-            
+
             {/* 4 Identitas Utama Utama */}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Nama Lengkap</Text>
               <Text style={styles.infoValue}>{babyProfile.name}</Text>
             </View>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Nomor Tempat Tidur</Text>
               <Text style={styles.infoValue}>{babyProfile.bed_number}</Text>
             </View>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Tanggal Lahir</Text>
               <Text style={styles.infoValue}>
-                {new Date(babyProfile.date_of_birth).toLocaleDateString('id-ID', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                {new Date(babyProfile.date_of_birth).toLocaleDateString(
+                  "id-ID",
+                  {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  },
+                )}
               </Text>
             </View>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Nama Orang Tua (Wali)</Text>
               <Text style={styles.infoValue}>{babyProfile.parent_name}</Text>
@@ -183,37 +203,48 @@ export default function ParentDashboard() {
               <View style={styles.expandedContent}>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Kode Unik Akses</Text>
-                  <Text style={[styles.infoValue, styles.monoText]}>{babyProfile.unique_code}</Text>
+                  <Text style={[styles.infoValue, styles.monoText]}>
+                    {babyProfile.unique_code}
+                  </Text>
                 </View>
-                
+
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Waktu Masuk Sistem</Text>
                   <Text style={styles.infoValue}>
-                    {new Date(babyProfile.created_at).toLocaleDateString('id-ID')} - {new Date(babyProfile.created_at).toLocaleTimeString('id-ID')}
+                    {new Date(babyProfile.created_at).toLocaleDateString(
+                      "id-ID",
+                    )}{" "}
+                    -{" "}
+                    {new Date(babyProfile.created_at).toLocaleTimeString(
+                      "id-ID",
+                    )}
                   </Text>
                 </View>
               </View>
             )}
 
             {/* Tombol Lebih Lanjut Menggunakan SVG Panah */}
-            <TouchableOpacity 
-              style={styles.expandButton} 
+            <TouchableOpacity
+              style={styles.expandButton}
               onPress={() => setIsExpanded(!isExpanded)}
               activeOpacity={0.7}
             >
               <Text style={styles.expandButtonText}>
-                {isExpanded ? 'Sembunyikan' : 'Lebih Lanjut'}
+                {isExpanded ? "Sembunyikan" : "Lebih Lanjut"}
               </Text>
-              <Svg 
-                width="14" 
-                height="14" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="#0F6E56" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
+              <Svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0F6E56"
+                strokeWidth="2.5"
+                strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }], marginLeft: 4 }}
+                style={{
+                  transform: [{ rotate: isExpanded ? "180deg" : "0deg" }],
+                  marginLeft: 4,
+                }}
               >
                 <Path d="M6 9l6 6 6-6" />
               </Svg>
@@ -225,17 +256,17 @@ export default function ParentDashboard() {
         {status && (
           <ActivityCard
             key={`${status.activity}-${status.soundClass}-${status.lastUpdated}`}
-            activity={status.activity ?? 'sleeping'}
-            soundClass={status.soundClass ?? 'not_crying'}
+            activity={status.activity ?? "sleeping"}
+            soundClass={status.soundClass ?? "not_crying"}
             soundConfidence={status.soundConfidence ?? 0}
-            nightVision={status.nightVisionActive}
-            faceAnomaly={status.faceAnomaly ?? 'none'}
+            faceAnomaly={status.faceAnomaly ?? "none"}
           />
         )}
 
         {status?.lastUpdated && (
           <Text style={styles.lastUpdated}>
-            Sinkronisasi terakhir: {new Date(status.lastUpdated).toLocaleTimeString('id-ID')}
+            Sinkronisasi terakhir:{" "}
+            {new Date(status.lastUpdated).toLocaleTimeString("id-ID")}
           </Text>
         )}
       </ScrollView>
@@ -244,96 +275,96 @@ export default function ParentDashboard() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0F9F5' },
+  safe: { flex: 1, backgroundColor: "#F0F9F5" },
   scroll: { flex: 1 },
   content: { padding: 20, gap: 14, paddingBottom: 40 },
 
   // Header
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 6,
   },
   headerLeft: { flex: 1, gap: 2 },
-  greeting: { fontSize: 13, color: '#0F6E56', fontWeight: '500' },
-  babyName: { fontSize: 24, fontWeight: '700', color: '#085041' },
-  bedNum: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  headerRight: { alignItems: 'flex-end', gap: 8 },
+  greeting: { fontSize: 13, color: "#0F6E56", fontWeight: "500" },
+  babyName: { fontSize: 24, fontWeight: "700", color: "#085041" },
+  bedNum: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  headerRight: { alignItems: "flex-end", gap: 8 },
 
   // Badges & Buttons
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
+  badgeText: { fontSize: 11, fontWeight: "600" },
   logoutBtn: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: "#FEE2E2",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 5,
   },
-  logoutText: { fontSize: 11, color: '#E24B4A', fontWeight: '600' },
+  logoutText: { fontSize: 11, color: "#E24B4A", fontWeight: "600" },
 
   // Loading State
   loadingBox: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 30,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
-  loadingText: { fontSize: 13, color: '#6B7280' },
+  loadingText: { fontSize: 13, color: "#6B7280" },
 
   // Identity Card Style
   identityCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 18,
     gap: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#085041',
+    fontWeight: "700",
+    color: "#085041",
   },
   divider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: "#E5E7EB",
     marginVertical: 2,
   },
   infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 4,
   },
   infoLabel: {
     fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
+    color: "#6B7280",
+    fontWeight: "500",
     flex: 1,
   },
   infoValue: {
     fontSize: 13,
-    color: '#111827',
-    fontWeight: '600',
-    textAlign: 'right',
+    color: "#111827",
+    fontWeight: "600",
+    textAlign: "right",
     flex: 1.5,
   },
   expandedContent: {
@@ -341,29 +372,29 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   expandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 6,
     marginTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: "#F3F4F6",
   },
   expandButtonText: {
     fontSize: 12,
-    color: '#0F6E56',
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
-    fontWeight: '600',
+    color: "#0F6E56",
+    fontFamily: Platform.OS === "ios" ? "Inter" : "sans-serif-medium",
+    fontWeight: "600",
   },
   monoText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#0F6E56',
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    color: "#0F6E56",
     letterSpacing: 0.5,
   },
   lastUpdated: {
     fontSize: 11,
-    color: '#9CA3AF',
-    textAlign: 'center',
+    color: "#9CA3AF",
+    textAlign: "center",
     marginTop: 6,
   },
 });

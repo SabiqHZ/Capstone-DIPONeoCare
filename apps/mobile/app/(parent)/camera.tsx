@@ -1,9 +1,9 @@
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
@@ -28,7 +28,6 @@ export default function CameraScreen() {
   const babyId = user?.role === "parent" ? user.babyId : null;
   const focusedStatus = babyId ? state.statuses[babyId] : null;
   const isDeviceOnline = focusedStatus?.deviceOnline ?? false;
-  const nightVision = focusedStatus?.nightVisionActive ?? false;
 
   useEffect(() => {
     if (babyId) void fetchStreamUrl();
@@ -74,11 +73,6 @@ export default function CameraScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Live Kamera</Text>
         <View style={styles.badges}>
-          {nightVision && (
-            <View style={styles.nightBadge}>
-              <Text style={styles.nightText}>Night Vision</Text>
-            </View>
-          )}
           <View
             style={[
               styles.onlineBadge,

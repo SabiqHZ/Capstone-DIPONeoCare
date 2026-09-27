@@ -70,12 +70,6 @@ export const aiDispatchService = {
       ...form.getHeaders(),
     };
 
-    // API key hanya dikirim kalau memang dikonfigurasi.
-    // Saat ini kita sedang testing tanpa API key.
-    if (env.AI_SERVER_API_KEY) {
-      headers["x-api-key"] = env.AI_SERVER_API_KEY;
-    }
-
     try {
       console.log(`[AI] dispatching ${kind} → ${requestUrl}`);
 

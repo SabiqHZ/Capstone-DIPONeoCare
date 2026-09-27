@@ -1,9 +1,7 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-  Alert, SafeAreaView, Image,
-} from 'react-native';
+  View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { useAuthStore } from '../../stores/auth.store';

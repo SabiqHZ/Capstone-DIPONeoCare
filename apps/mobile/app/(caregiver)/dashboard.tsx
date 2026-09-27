@@ -1,9 +1,9 @@
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Dimensions,
@@ -31,7 +31,6 @@ interface BabyWithStatus extends Baby {
     is_crying: boolean;
     crying_duration_sec: number;
     alert_level: string;
-    night_vision_active: boolean;
     activity?: string;
     sound_class?: string;
     face_anomaly?: string;
@@ -82,9 +81,6 @@ function BabyCard({
         baby.baby_statuses?.face_anomaly &&
         baby.baby_statuses.face_anomaly !== "none",
       );
-  const nvActive = activeStatus
-    ? activeStatus.nightVisionActive
-    : (baby.baby_statuses?.night_vision_active ?? false);
   const cryingSec = activeStatus
     ? activeStatus.cryingDurationSec
     : (baby.baby_statuses?.crying_duration_sec ?? 0);
@@ -122,11 +118,6 @@ function BabyCard({
               color="#fff"
             />
             <Text style={[styles.nvText, { color: "#fff" }]}>Wajah</Text>
-          </View>
-        ) : nvActive ? (
-          <View style={styles.nvPill}>
-            <Icon name="moon" library="ionicons" size={10} color="#a78bfa" />
-            <Text style={styles.nvText}>NV</Text>
           </View>
         ) : null}
 

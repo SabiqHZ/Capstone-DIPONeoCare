@@ -1,15 +1,7 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '../../components/ui/Icon';
 import { Colors } from '../../constants/colors';

@@ -1,9 +1,9 @@
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -162,16 +162,16 @@ export default function BabyDetailScreen() {
     : (baby.baby_statuses?.is_crying ?? false);
   const faceCovered = realtimeStatus
     ? realtimeStatus.faceAnomaly !== "none"
-    : Boolean(baby.baby_statuses?.face_anomaly && baby.baby_statuses.face_anomaly !== "none");
+    : Boolean(
+        baby.baby_statuses?.face_anomaly &&
+        baby.baby_statuses.face_anomaly !== "none",
+      );
   const activity = realtimeStatus
     ? realtimeStatus.activity
     : (baby.baby_statuses?.activity ?? "sleeping");
   const cryingDurationSec = realtimeStatus
     ? realtimeStatus.cryingDurationSec
     : (baby.baby_statuses?.crying_duration_sec ?? 0);
-  const nvActive = realtimeStatus
-    ? realtimeStatus.nightVisionActive
-    : (baby.baby_statuses?.night_vision_active ?? false);
   const lastUpdated = realtimeStatus
     ? realtimeStatus.lastUpdated
     : (baby.baby_statuses?.updated_at ?? new Date().toISOString());
@@ -179,13 +179,13 @@ export default function BabyDetailScreen() {
   // IP perangkat diperbarui saat register/heartbeat. Endpoint MJPEG selalu /stream.
   const deviceAddress = baby.devices?.local_ip?.trim();
   const streamBaseUrl = deviceAddress
-    ? (/^https?:\/\//i.test(deviceAddress)
-        ? deviceAddress
-        : `http://${deviceAddress}`)
+    ? /^https?:\/\//i.test(deviceAddress)
+      ? deviceAddress
+      : `http://${deviceAddress}`
     : null;
   const streamUrl = streamBaseUrl
     ? `${streamBaseUrl.replace(/\/+$/, "")}/stream`
-    : baby.devices?.stream_url ?? null;
+    : (baby.devices?.stream_url ?? null);
   const htmlContent = `
     <html>
       <body style="margin:0;padding:0;background-color:#111827;display:flex;justify-content:center;align-items:center;">
@@ -332,11 +332,6 @@ export default function BabyDetailScreen() {
                   <View style={styles.liveBadge}>
                     <Text style={styles.liveText}>🔴 LIVE</Text>
                   </View>
-                  {nvActive && (
-                    <View style={styles.nvBadge}>
-                      <Text style={styles.nvText}>🌙 NV</Text>
-                    </View>
-                  )}
                 </View>
 
                 {/* Status AI Komprehensif */}

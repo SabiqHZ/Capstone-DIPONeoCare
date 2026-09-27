@@ -1,16 +1,7 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  SafeAreaView,
-  Image,
-} from 'react-native';
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { OtpInput } from '../../components/ui/OtpInput';
 import { useAuthStore } from '../../stores/auth.store';

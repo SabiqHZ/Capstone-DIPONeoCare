@@ -3,7 +3,6 @@ dotenv.config();
 
 export const env = {
   AI_SERVER_URL: process.env.AI_SERVER_URL || "",
-  AI_SERVER_API_KEY: process.env.AI_SERVER_API_KEY || "",
   DEVICE_OFFLINE_AFTER_SEC: Number(
     process.env.DEVICE_OFFLINE_AFTER_SEC || "90",
   ),
