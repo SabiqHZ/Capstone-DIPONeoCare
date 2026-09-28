@@ -148,7 +148,7 @@ function BabyCard({
         <Text style={styles.cardName} numberOfLines={1}>
           {baby.name}
         </Text>
-        <Text style={styles.cardBed}>Bed {baby.bedNumber}</Text>
+        <Text style={styles.cardBed}>Bed {baby.bed_number}</Text>
 
         <View
           style={[

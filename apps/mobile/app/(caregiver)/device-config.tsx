@@ -1,16 +1,22 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Icon } from '../../components/ui/Icon';
-import { Colors } from '../../constants/colors';
-import { Fonts } from '../../constants/fonts';
-import { DeviceConfig } from '../../types';
-import api from '../../services/api';
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Icon } from "../../components/ui/Icon";
+import { Colors } from "../../constants/colors";
+import { Fonts } from "../../constants/fonts";
+import { DeviceConfig } from "../../types";
+import api from "../../services/api";
 
 const DEFAULT_CONFIG: DeviceConfig = {
-  deviceId: 'SV-DEMO01',
+  deviceId: "SV-DEMO01",
   cryingMinDurationSec: 10,
   notificationCooldownSec: 120,
 };
@@ -90,6 +96,7 @@ export default function DeviceConfigScreen() {
     deviceId: deviceId ?? DEFAULT_CONFIG.deviceId,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const update = (key: keyof DeviceConfig, delta: number, step: number) => {
     setConfig((c) => ({
@@ -105,26 +112,71 @@ export default function DeviceConfigScreen() {
         cryingMinDurationSec: config.cryingMinDurationSec,
         notificationCooldownSec: config.notificationCooldownSec,
       });
-      Alert.alert('Berhasil', 'Konfigurasi perangkat berhasil disimpan.');
+      Alert.alert("Berhasil", "Konfigurasi perangkat berhasil disimpan.");
     } catch (error: any) {
-      Alert.alert('Gagal', error.response?.data?.error || 'Konfigurasi perangkat tidak dapat disimpan.');
+      Alert.alert(
+        "Gagal",
+        error.response?.data?.error ||
+          "Konfigurasi perangkat tidak dapat disimpan.",
+      );
     } finally {
       setIsSaving(false);
     }
   };
+  const loadConfig = async () => {
+    if (!deviceId) return;
+
+    setIsLoading(true);
+
+    try {
+      const response = await api.get(`/devices/${deviceId}/config`);
+
+      const data = response.data.data;
+
+      setConfig({
+        deviceId: data.id,
+        cryingMinDurationSec:
+          data.crying_min_duration_sec ?? DEFAULT_CONFIG.cryingMinDurationSec,
+        notificationCooldownSec:
+          data.notification_cooldown_sec ??
+          DEFAULT_CONFIG.notificationCooldownSec,
+      });
+    } catch (error: any) {
+      console.error(
+        "[DeviceConfig] Gagal mengambil konfigurasi:",
+        error.response?.data || error,
+      );
+
+      Alert.alert(
+        "Gagal",
+        error.response?.data?.error ||
+          "Konfigurasi perangkat tidak dapat dimuat.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadConfig();
+  }, [deviceId]);
 
   const handleReset = () => {
     Alert.alert(
-      'Reset Konfigurasi',
-      'Kembalikan semua pengaturan ke nilai default?',
+      "Reset Konfigurasi",
+      "Kembalikan semua pengaturan ke nilai default?",
       [
-        { text: 'Batal', style: 'cancel' },
+        { text: "Batal", style: "cancel" },
         {
-          text: 'Reset',
-          onPress: () => setConfig(DEFAULT_CONFIG),
-          style: 'destructive',
+          text: "Reset",
+          onPress: () =>
+            setConfig({
+              ...DEFAULT_CONFIG,
+              deviceId: deviceId ?? DEFAULT_CONFIG.deviceId,
+            }),
+          style: "destructive",
         },
-      ]
+      ],
     );
   };
 
@@ -180,8 +232,8 @@ export default function DeviceConfigScreen() {
               min={5}
               max={60}
               unit="detik"
-              onDecrease={() => update('cryingMinDurationSec', -1, 1)}
-              onIncrease={() => update('cryingMinDurationSec', 1, 1)}
+              onDecrease={() => update("cryingMinDurationSec", -1, 1)}
+              onIncrease={() => update("cryingMinDurationSec", 1, 1)}
             />
           </View>
         </View>
@@ -205,8 +257,8 @@ export default function DeviceConfigScreen() {
               min={30}
               max={300}
               unit="detik"
-              onDecrease={() => update('notificationCooldownSec', -1, 10)}
-              onIncrease={() => update('notificationCooldownSec', 1, 10)}
+              onDecrease={() => update("notificationCooldownSec", -1, 10)}
+              onIncrease={() => update("notificationCooldownSec", 1, 10)}
             />
           </View>
         </View>
@@ -228,7 +280,7 @@ export default function DeviceConfigScreen() {
         <TouchableOpacity
           style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
           onPress={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || isLoading}
           activeOpacity={0.85}
         >
           <Icon
@@ -238,7 +290,11 @@ export default function DeviceConfigScreen() {
             color={Colors.white}
           />
           <Text style={styles.saveBtnText}>
-            {isSaving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+            {isLoading
+              ? "Memuat konfigurasi..."
+              : isSaving
+                ? "Menyimpan..."
+                : "Simpan Konfigurasi"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -248,9 +304,9 @@ export default function DeviceConfigScreen() {
 
 const sliderStyles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
     paddingVertical: 4,
   },
@@ -266,17 +322,17 @@ const sliderStyles = StyleSheet.create({
     color: Colors.textMuted,
     lineHeight: 16,
   },
-  control: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  control: { flexDirection: "row", alignItems: "center", gap: 4 },
   btn: {
     width: 32,
     height: 32,
     borderRadius: 8,
     backgroundColor: Colors.secondaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   btnDisabled: { backgroundColor: Colors.borderLight },
-  valueBox: { alignItems: 'center', minWidth: 52 },
+  valueBox: { alignItems: "center", minWidth: 52 },
   value: {
     fontFamily: Fonts.nunitoBold,
     fontSize: 18,
@@ -292,9 +348,9 @@ const sliderStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.backgroundNurse },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: Colors.white,
@@ -315,8 +371,8 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 20, paddingBottom: 40 },
   section: { gap: 10 },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   sectionTitle: {
@@ -329,15 +385,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 20,
     gap: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 8,
     backgroundColor: Colors.secondaryLight,
     borderRadius: 10,
@@ -351,15 +407,15 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
     backgroundColor: Colors.secondary,
     borderRadius: 12,
     paddingVertical: 15,
   },
-  saveBtnDisabled: { backgroundColor: '#B5D4F4' },
+  saveBtnDisabled: { backgroundColor: "#B5D4F4" },
   saveBtnText: {
     fontFamily: Fonts.nunitoBold,
     fontSize: 16,

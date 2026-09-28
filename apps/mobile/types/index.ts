@@ -43,7 +43,7 @@ export interface BabyStatus {
 export interface Baby {
   id: string;
   name: string;
-  bedNumber: string;
+  bed_number: string;
   dateOfBirth: string;
   parentName: string;
   uniqueCode: string;

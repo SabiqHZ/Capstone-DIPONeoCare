@@ -3,6 +3,21 @@ import { supabaseAdmin } from "../config/supabase";
 import { ActivityFlags, BabyActivity, DeviceContext } from "../types";
 
 export const deviceService = {
+  async getDeviceConfigById(deviceId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .select("id, crying_min_duration_sec, notification_cooldown_sec")
+      .eq("id", deviceId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+
+    if (!data) {
+      throw new Error("Perangkat tidak ditemukan");
+    }
+
+    return data;
+  },
   async registerOrGetDevice(payload: {
     macAddress: string;
     localIp?: string;

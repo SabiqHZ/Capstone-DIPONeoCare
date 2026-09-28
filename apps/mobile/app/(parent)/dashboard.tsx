@@ -20,7 +20,7 @@ import {
 import { babyService } from "../../services/baby.service";
 import { ActivityCard } from "../../components/baby/ActivityCard";
 import { AlertBanner } from "../../components/ui/AlertBanner";
-import { FaceAnomalyBanner } from "@/components/ui/FaceAnomalyBanner";
+import { FaceAnomalyBanner } from "../../components/ui/FaceAnomalyBanner";
 
 interface BabyProfile {
   id: string;
