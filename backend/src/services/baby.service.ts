@@ -34,7 +34,7 @@ export const babyService = {
         baby_statuses (
           activity, is_sleeping, is_awake,
           is_crying, crying_duration_sec, alert_level,
-          sound_class, sound_confidence,
+          sound_class, sound_confidence, crying_class,
           face_anomaly, face_detected, body_detected, updated_at
         ),
         devices (

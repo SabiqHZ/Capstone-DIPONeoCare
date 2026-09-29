@@ -1,4 +1,4 @@
-const DEFAULT_DEV_IP = "192.168.0.7";
+const DEFAULT_DEV_IP = "10.131.221.250";
 const DEV_IP = process.env.EXPO_PUBLIC_DEV_IP || DEFAULT_DEV_IP;
 
 export const CONFIG = {

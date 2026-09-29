@@ -1,9 +1,13 @@
 import { Request, Response } from "express";
 import { broadcastAlert, broadcastBabyStatus } from "../socket/socket.handler";
 import { io } from "../app";
-import { AudioSecondResult, VisionResultPayload } from "../types";
+import { AudioSecondResult, CryingClass, VisionResultPayload } from "../types";
 import { deviceService } from "../services/device.service";
 import { inferenceService } from "../services/inference.service";
+
+function isCryingClass(value: unknown): value is CryingClass {
+  return value === "hungry" || value === "pain" || value === "discomfort";
+}
 
 function isFlag(value: unknown): value is boolean {
   return typeof value === "boolean";
@@ -12,6 +16,7 @@ function isFlag(value: unknown): value is boolean {
 function validConfidence(value: unknown): boolean {
   return (
     value === undefined ||
+    value === null ||
     (typeof value === "number" && value >= 0 && value <= 1)
   );
 }
@@ -57,9 +62,12 @@ function parseAudioResults(
     typeof body.macAddress !== "string" ||
     !Array.isArray(body.results) ||
     body.results.length !== 5
-  )
+  ) {
     return null;
+  }
+
   const results = body.results as AudioSecondResult[];
+
   if (
     results.some(
       (item) =>
@@ -67,11 +75,20 @@ function parseAudioResults(
         typeof item.timestamp !== "string" ||
         Number.isNaN(Date.parse(item.timestamp)) ||
         !isFlag(item.isCrying) ||
-        !validConfidence(item.confidence),
+        !validConfidence(item.confidence) ||
+        !validConfidence(item.cryingClassConfidence) ||
+        (item.isCrying
+          ? !isCryingClass(item.cryingClass)
+          : item.cryingClass !== null),
     )
-  )
+  ) {
     return null;
-  return { macAddress: body.macAddress, results };
+  }
+
+  return {
+    macAddress: body.macAddress,
+    results,
+  };
 }
 
 function emitFinalized(
@@ -88,6 +105,8 @@ function emitFinalized(
       isCrying: status.flags.crying,
       soundClass: status.soundClass,
       soundConfidence: status.soundConfidence,
+      cryingClass: status.cryingClass,
+      cryingClassConfidence: status.cryingClassConfidence,
       cryingDurationSec: status.cryingDurationSec,
       alertLevel: status.flags.crying ? "warning" : "normal",
       faceAnomaly: status.anomalyType ?? "none",

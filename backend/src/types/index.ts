@@ -17,6 +17,7 @@ export interface AuthRequest extends Request {
 
 export type BabyActivity = "sleeping" | "awake" | "crying";
 export type AlertLevel = "normal" | "warning" | "critical";
+export type CryingClass = "hungry" | "pain" | "discomfort";
 
 export interface ActivityFlags {
   sleeping: boolean;
@@ -65,4 +66,6 @@ export interface AudioSecondResult {
   timestamp: string;
   isCrying: boolean;
   confidence?: number;
+  cryingClass: CryingClass | null;
+  cryingClassConfidence?: number;
 }

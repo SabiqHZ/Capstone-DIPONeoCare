@@ -208,6 +208,7 @@ export const deviceService = {
       alertLevel: string;
       soundClass: "crying" | "not_crying";
       soundConfidence: number;
+      cryingClass: "hungry" | "pain" | "discomfort" | null;
       anomalyType: string | null;
       updatedAt: string;
     },
@@ -237,6 +238,7 @@ export const deviceService = {
         alert_level: status.alertLevel,
         sound_class: status.soundClass,
         sound_confidence: status.soundConfidence,
+        crying_class: status.cryingClass,
         face_anomaly: status.anomalyType,
         updated_at: status.updatedAt,
       },
@@ -254,6 +256,7 @@ export const deviceService = {
     audioCrying: boolean;
     visualConfidence?: number;
     audioConfidence?: number;
+    cryingClass: "hungry" | "pain" | "discomfort" | null;
   }) {
     const { error } = await supabaseAdmin.from("baby_activity_samples").upsert(
       {
@@ -266,6 +269,7 @@ export const deviceService = {
         audio_crying: payload.audioCrying,
         visual_confidence: payload.visualConfidence ?? null,
         audio_confidence: payload.audioConfidence ?? null,
+        crying_class: payload.cryingClass,
         recorded_at: payload.recordedAt,
       },
       { onConflict: "baby_id,recorded_at", ignoreDuplicates: true },

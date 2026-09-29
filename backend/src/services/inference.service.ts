@@ -13,8 +13,13 @@ type FinalizedStatus = {
   unitId: string | null;
   activity: "sleeping" | "awake" | "crying";
   flags: ActivityFlags;
+
   soundClass: "crying" | "not_crying";
   soundConfidence: number;
+
+  cryingClass: "hungry" | "pain" | "discomfort" | null;
+  cryingClassConfidence: number | null;
+
   cryingDurationSec: number;
   anomalyType: string | null;
   updatedAt: string;
@@ -50,6 +55,10 @@ export const inferenceService = {
       captured_at: result.timestamp,
       is_crying: result.isCrying,
       confidence: result.confidence ?? null,
+      crying_class: result.isCrying ? result.cryingClass : null,
+      crying_class_confidence: result.isCrying
+        ? (result.cryingClassConfidence ?? null)
+        : null,
     }));
     const { error } = await supabaseAdmin
       .from("ai_audio_results")
@@ -92,6 +101,13 @@ export const inferenceService = {
       if (!audio) continue;
 
       const crying = Boolean(vision.visual_crying) && Boolean(audio.is_crying);
+      const cryingClass =
+        crying && audio.crying_class ? audio.crying_class : null;
+
+      const cryingClassConfidence =
+        crying && audio.crying_class_confidence != null
+          ? Number(audio.crying_class_confidence)
+          : null;
       const flags: ActivityFlags = crying
         ? { sleeping: false, awake: false, crying: true }
         : {
@@ -114,6 +130,7 @@ export const inferenceService = {
         audioCrying: Boolean(audio.is_crying),
         visualConfidence: vision.visual_confidence ?? undefined,
         audioConfidence: audio.confidence ?? undefined,
+        cryingClass,
       });
 
       const cryingDurationSec = crying
@@ -131,6 +148,7 @@ export const inferenceService = {
         soundConfidence: Number(audio.confidence ?? 0),
         anomalyType: vision.anomaly_detected ? vision.anomaly_type : null,
         updatedAt: vision.captured_at,
+        cryingClass,
       });
 
       finalized.push({
@@ -140,9 +158,12 @@ export const inferenceService = {
         flags,
         soundClass: audio.is_crying ? "crying" : "not_crying",
         soundConfidence: Number(audio.confidence ?? 0),
+
         cryingDurationSec,
         anomalyType: vision.anomaly_detected ? vision.anomaly_type : null,
         updatedAt: vision.captured_at,
+        cryingClass,
+        cryingClassConfidence,
       });
     }
     return finalized;
