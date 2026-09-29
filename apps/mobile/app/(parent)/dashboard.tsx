@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
@@ -148,7 +149,16 @@ export default function ParentDashboard() {
             message={a.message}
             severity={a.severity}
             time={new Date(a.timestamp).toLocaleTimeString("id-ID")}
-            onDismiss={() => acknowledgeAlert(a.id)}
+            onDismiss={async () => {
+              try {
+                await acknowledgeAlert(a.id);
+              } catch {
+                Alert.alert(
+                  "Gagal",
+                  "Alert belum dapat ditandai sebagai sudah ditangani.",
+                );
+              }
+            }}
           />
         ))}
 

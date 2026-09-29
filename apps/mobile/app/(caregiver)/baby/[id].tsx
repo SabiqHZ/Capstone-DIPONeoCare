@@ -309,7 +309,16 @@ export default function BabyDetailScreen() {
             message={a.message}
             severity={a.severity}
             time={new Date(a.timestamp).toLocaleTimeString("id-ID")}
-            onDismiss={() => acknowledgeAlert(a.id)}
+            onDismiss={async () => {
+              try {
+                await acknowledgeAlert(a.id);
+              } catch {
+                Alert.alert(
+                  "Gagal",
+                  "Alert belum dapat ditandai sebagai sudah ditangani.",
+                );
+              }
+            }}
           />
         ))}
 

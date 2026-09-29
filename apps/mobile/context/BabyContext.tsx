@@ -75,7 +75,7 @@ function babyReducer(state: BabyState, action: BabyAction): BabyState {
 interface BabyContextValue {
   state: BabyState;
   setFocused: (babyId: string) => void;
-  acknowledgeAlert: (alertId: string) => void;
+  acknowledgeAlert: (alertId: string) => Promise<void>;
 }
 
 const BabyContext = createContext<BabyContextValue | null>(null);
@@ -218,8 +218,24 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const acknowledgeAlert = useCallback((alertId: string) => {
-    dispatch({ type: "ACK_ALERT", payload: alertId });
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    try {
+      await api.patch(`/alerts/${alertId}/acknowledge`);
+
+      dispatch({
+        type: "ACK_ALERT",
+        payload: alertId,
+      });
+
+      console.log(`[BabyContext] Alert ${alertId} berhasil di-acknowledge`);
+    } catch (error: any) {
+      console.error(
+        "[BabyContext] Gagal acknowledge alert:",
+        error.response?.data || error,
+      );
+
+      throw error;
+    }
   }, []);
 
   return (
