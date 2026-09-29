@@ -49,14 +49,23 @@ function detectLocalIp() {
 function loadState() {
   try {
     const raw = fs.readFileSync(STATE_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    if (parsed.macAddress && parsed.deviceToken) return parsed;
-  } catch (_) {
-    // First run or invalid state: register on demand.
-  }
-  return { macAddress: MAC_ADDRESS, deviceId: null, deviceToken: null };
-}
 
+    const parsed = JSON.parse(raw);
+
+    if (parsed.macAddress === MAC_ADDRESS && parsed.deviceToken) {
+      return parsed;
+    }
+  } catch (_) {
+    // First run or invalid state:
+    // register on demand.
+  }
+
+  return {
+    macAddress: MAC_ADDRESS,
+    deviceId: null,
+    deviceToken: null,
+  };
+}
 function saveState() {
   fs.writeFileSync(
     STATE_FILE,

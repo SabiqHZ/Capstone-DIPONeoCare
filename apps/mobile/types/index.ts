@@ -96,3 +96,9 @@ export interface DailyReport {
   totalCryingEvents: number;
   hourlyActivities: HourlyActivityData[];
 }
+export interface ReportHistoryItem {
+  date: string;
+  total_sleep_minutes: number;
+  total_awake_minutes: number;
+  total_crying_events: number;
+}

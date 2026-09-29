@@ -32,28 +32,43 @@ export const deviceService = {
     if (findError) throw new Error(findError.message);
 
     if (existing) {
-      // Registration is also the recovery path when a device has been reflashed
-      // and no longer has its token in flash.
+      // Re-registration juga menjadi recovery path ketika
+      // device sudah di-flash ulang dan token lama hilang.
       const deviceToken = crypto.randomBytes(32).toString("hex");
+
       const deviceTokenHash = crypto
         .createHash("sha256")
         .update(deviceToken)
         .digest("hex");
+
       const { data, error } = await supabaseAdmin
         .from("devices")
         .update({
           local_ip: payload.localIp ?? existing.local_ip,
+
           firmware_version:
             payload.firmwareVersion ?? existing.firmware_version,
+
+          name: payload.name ?? existing.name,
+
           device_token_hash: deviceTokenHash,
+
           is_online: true,
+
           last_heartbeat: new Date().toISOString(),
         })
         .eq("id", existing.id)
         .select()
         .single();
-      if (error) throw new Error(error.message);
-      return { device: data, deviceToken };
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return {
+        device: data,
+        deviceToken,
+      };
     }
 
     const deviceToken = crypto.randomBytes(32).toString("hex");

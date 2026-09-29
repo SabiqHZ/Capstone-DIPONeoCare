@@ -1,11 +1,18 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useAuthStore } from "../../stores/auth.store";
 import { reportService } from "../../services/report.service";
-import { DailyReport } from "../../types";
+import { DailyReport, ReportHistoryItem } from "../../types";
 
 export default function ReportScreen() {
   const babyId = useAuthStore((s) =>
@@ -13,6 +20,8 @@ export default function ReportScreen() {
   );
 
   const [report, setReport] = useState<DailyReport | null>(null);
+  const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
@@ -38,11 +47,33 @@ export default function ReportScreen() {
       setIsRefreshing(false);
     }
   }, [babyId, selectedDate]);
+  const fetchReportHistory = useCallback(async () => {
+    if (!babyId) {
+      setReportHistory([]);
+      setIsHistoryLoading(false);
+      return;
+    }
+
+    try {
+      const data = await reportService.getReportList(babyId);
+      setReportHistory(data);
+    } catch (error) {
+      console.error("[ParentReport] Gagal memuat riwayat laporan:", error);
+      setReportHistory([]);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [babyId]);
 
   useEffect(() => {
     setIsLoading(true);
-    fetchReport();
+    void fetchReport();
   }, [fetchReport]);
+
+  useEffect(() => {
+    setIsHistoryLoading(true);
+    void fetchReportHistory();
+  }, [fetchReportHistory]);
 
   const goDay = (dir: -1 | 1) => {
     const d = new Date(selectedDate);
@@ -111,7 +142,7 @@ export default function ReportScreen() {
             refreshing={isRefreshing}
             onRefresh={() => {
               setIsRefreshing(true);
-              fetchReport();
+              void Promise.all([fetchReport(), fetchReportHistory()]);
             }}
             colors={["#1D9E75"]}
           />
@@ -209,6 +240,92 @@ export default function ReportScreen() {
                 </Text>
                 <Text style={styles.summaryLabel}>Kejadian Menangis</Text>
               </View>
+            </View>
+
+            <View style={styles.historyCard}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyTitle}>Riwayat Laporan</Text>
+                <Text style={styles.historySubtitle}>
+                  Pilih tanggal laporan
+                </Text>
+              </View>
+
+              {isHistoryLoading ? (
+                <View style={styles.historyLoading}>
+                  <ActivityIndicator size="small" color="#1D9E75" />
+                  <Text style={styles.historyLoadingText}>
+                    Memuat riwayat...
+                  </Text>
+                </View>
+              ) : reportHistory.length === 0 ? (
+                <Text style={styles.historyEmpty}>
+                  Belum ada riwayat laporan.
+                </Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.historyList}
+                >
+                  {reportHistory.map((item) => {
+                    const isSelected = item.date === selectedDate;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.date}
+                        style={[
+                          styles.historyItem,
+                          isSelected && styles.historyItemSelected,
+                        ]}
+                        onPress={() => setSelectedDate(item.date)}
+                      >
+                        <Text
+                          style={[
+                            styles.historyDate,
+                            isSelected && styles.historyDateSelected,
+                          ]}
+                        >
+                          {new Date(`${item.date}T00:00:00`).toLocaleDateString(
+                            "id-ID",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )}
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.historyMeta,
+                            isSelected && styles.historyMetaSelected,
+                          ]}
+                        >
+                          Tidur {Math.round(item.total_sleep_minutes)}m
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.historyMeta,
+                            isSelected && styles.historyMetaSelected,
+                          ]}
+                        >
+                          Bangun {Math.round(item.total_awake_minutes)}m
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.historyMeta,
+                            isSelected && styles.historyMetaSelected,
+                          ]}
+                        >
+                          Menangis {item.total_crying_events}x
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
 
             <View style={styles.chartCard}>
@@ -390,6 +507,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 8,
   },
+
   dateBtn: { padding: 8 },
   dateCenter: { flex: 1, alignItems: "center" },
   dateText: { fontSize: 13, fontWeight: "600", color: "#374151" },
@@ -417,6 +535,68 @@ const styles = StyleSheet.create({
   awakeValue: { color: "#B7791F" },
   cryingValue: { color: "#C53030" },
   summaryLabel: { marginTop: 4, fontSize: 12, color: "#6B7280" },
+  historyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    elevation: 1,
+  },
+  historyHeader: {
+    gap: 3,
+  },
+  historyTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  historySubtitle: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  historyList: {
+    gap: 10,
+  },
+  historyItem: {
+    width: 145,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    gap: 4,
+  },
+  historyItemSelected: {
+    backgroundColor: "#E8F7F1",
+    borderWidth: 1,
+    borderColor: "#1D9E75",
+  },
+  historyDate: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+  },
+  historyDateSelected: {
+    color: "#0F6E56",
+  },
+  historyMeta: {
+    fontSize: 10,
+    color: "#6B7280",
+  },
+  historyMetaSelected: {
+    color: "#35685A",
+  },
+  historyLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  historyLoadingText: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  historyEmpty: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
   chartCard: {
     backgroundColor: "#fff",
     borderRadius: 16,

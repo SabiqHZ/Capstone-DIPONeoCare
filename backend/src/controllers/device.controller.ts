@@ -13,18 +13,57 @@ export const deviceController = {
   async register(req: Request, res: Response): Promise<void> {
     try {
       const { macAddress, localIp, firmwareVersion, name } = req.body;
+
       if (typeof macAddress !== "string" || !macAddress.trim()) {
-        res
-          .status(400)
-          .json({ success: false, error: "macAddress wajib diisi" });
+        res.status(400).json({
+          success: false,
+          error: "macAddress wajib diisi",
+        });
         return;
       }
+
+      if (
+        localIp !== undefined &&
+        localIp !== null &&
+        typeof localIp !== "string"
+      ) {
+        res.status(400).json({
+          success: false,
+          error: "localIp harus berupa string",
+        });
+        return;
+      }
+
+      if (
+        firmwareVersion !== undefined &&
+        firmwareVersion !== null &&
+        typeof firmwareVersion !== "string"
+      ) {
+        res.status(400).json({
+          success: false,
+          error: "firmwareVersion harus berupa string",
+        });
+        return;
+      }
+
+      if (name !== undefined && name !== null && typeof name !== "string") {
+        res.status(400).json({
+          success: false,
+          error: "name harus berupa string",
+        });
+        return;
+      }
+
       const { device, deviceToken } = await deviceService.registerOrGetDevice({
         macAddress: macAddress.trim(),
-        localIp,
-        firmwareVersion,
-        name,
+        localIp: typeof localIp === "string" ? localIp.trim() : undefined,
+        firmwareVersion:
+          typeof firmwareVersion === "string"
+            ? firmwareVersion.trim()
+            : undefined,
+        name: typeof name === "string" ? name.trim() : undefined,
       });
+
       res.status(201).json({
         success: true,
         data: {
@@ -34,7 +73,12 @@ export const deviceController = {
         },
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error("[Device Register] failed:", err);
+
+      res.status(500).json({
+        success: false,
+        error: err.message,
+      });
     }
   },
 
@@ -76,13 +120,10 @@ export const deviceController = {
         !captureId ||
         !isIsoTimestamp(timestamp)
       ) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error:
-              "image, macAddress, captureId, dan timestamp ISO wajib diisi",
-          });
+        res.status(400).json({
+          success: false,
+          error: "image, macAddress, captureId, dan timestamp ISO wajib diisi",
+        });
         return;
       }
       const device = await deviceService.getDeviceByMac(macAddress);
@@ -136,13 +177,11 @@ export const deviceController = {
         captureIds.length !== 5 ||
         captureIds.some((id) => typeof id !== "string" || !id)
       ) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error:
-              "audio, macAddress, audioWindowId, startedAt, durationSeconds=5, dan lima captureIds wajib valid",
-          });
+        res.status(400).json({
+          success: false,
+          error:
+            "audio, macAddress, audioWindowId, startedAt, durationSeconds=5, dan lima captureIds wajib valid",
+        });
         return;
       }
       const device = await deviceService.getDeviceByMac(macAddress);
@@ -222,12 +261,10 @@ export const deviceController = {
             notificationCooldownSec < 30 ||
             notificationCooldownSec > 300))
       ) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: "Nilai konfigurasi perangkat tidak valid",
-          });
+        res.status(400).json({
+          success: false,
+          error: "Nilai konfigurasi perangkat tidak valid",
+        });
         return;
       }
       const data = await deviceService.updateConfig(req.params.id as string, {
