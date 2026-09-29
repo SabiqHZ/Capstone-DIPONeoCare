@@ -1,9 +1,9 @@
-import { api } from './api';
-import { Baby } from '../types';
+import { api } from "./api";
+import { Baby } from "../types";
 
 export const babyService = {
   getBabies: async (): Promise<any[]> => {
-    const res = await api.get('/babies');
+    const res = await api.get("/babies");
     return res.data.data;
   },
 
@@ -18,11 +18,14 @@ export const babyService = {
     dateOfBirth: string;
     parentName: string;
   }): Promise<Baby> => {
-    const res = await api.post('/babies', payload);
+    const res = await api.post("/babies", payload);
     return res.data.data;
   },
 
   pairDevice: async (babyId: string, deviceId: string): Promise<void> => {
-    await api.post('/babies/pair', { babyId, deviceId });
+    await api.post("/babies/pair", { babyId, deviceId });
+  },
+  dischargeBaby: async (babyId: string): Promise<void> => {
+    await api.delete(`/babies/${babyId}`);
   },
 };

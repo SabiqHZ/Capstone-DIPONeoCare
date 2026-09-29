@@ -138,4 +138,84 @@ export const babyService = {
     if (error) throw new Error(error.message);
     return { success: true };
   },
+  async dischargeBaby(babyId: string, nurseUnitId: string) {
+    const { data: baby, error: babyError } = await supabaseAdmin
+      .from("babies")
+      .select("id, unit_id")
+      .eq("id", babyId)
+      .maybeSingle();
+
+    if (babyError) {
+      throw new Error(babyError.message);
+    }
+
+    if (!baby) {
+      throw new Error("Bayi tidak ditemukan");
+    }
+
+    // Pastikan caregiver hanya dapat mengeluarkan bayi
+    // yang berada di unit miliknya.
+    if (baby.unit_id !== nurseUnitId) {
+      throw new Error("Bayi bukan bagian dari unit pengasuh");
+    }
+
+    // Simpan device yang terhubung sebagai backup untuk rollback
+    // apabila penghapusan bayi gagal.
+    const { data: devices, error: deviceLookupError } = await supabaseAdmin
+      .from("devices")
+      .select("id")
+      .eq("baby_id", babyId);
+
+    if (deviceLookupError) {
+      throw new Error(deviceLookupError.message);
+    }
+
+    const deviceIds = (devices ?? []).map((device) => device.id);
+
+    // Putuskan relasi device -> baby terlebih dahulu.
+    if (deviceIds.length > 0) {
+      const { error: unpairError } = await supabaseAdmin
+        .from("devices")
+        .update({ baby_id: null })
+        .in("id", deviceIds);
+
+      if (unpairError) {
+        throw new Error(unpairError.message);
+      }
+    }
+
+    try {
+      // Hapus data bayi.
+      const { error: deleteError } = await supabaseAdmin
+        .from("babies")
+        .delete()
+        .eq("id", babyId);
+
+      if (deleteError) {
+        throw new Error(deleteError.message);
+      }
+
+      return {
+        id: babyId,
+        discharged: true,
+      };
+    } catch (error) {
+      // Jika delete gagal, coba kembalikan relasi device.
+      if (deviceIds.length > 0) {
+        const { error: rollbackError } = await supabaseAdmin
+          .from("devices")
+          .update({ baby_id: babyId })
+          .in("id", deviceIds);
+
+        if (rollbackError) {
+          console.error(
+            "[Baby] Gagal melakukan rollback device pairing:",
+            rollbackError.message,
+          );
+        }
+      }
+
+      throw error;
+    }
+  },
 };

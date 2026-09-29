@@ -1,13 +1,15 @@
-import { Response } from 'express';
-import { babyService } from '../services/baby.service';
-import { AuthRequest, ApiResponse } from '../types';
+import { Response } from "express";
+import { babyService } from "../services/baby.service";
+import { AuthRequest, ApiResponse } from "../types";
 
 export const babyController = {
   async getBabies(req: AuthRequest, res: Response): Promise<void> {
     try {
       const unitId = req.user?.unitId;
       if (!unitId) {
-        res.status(400).json({ success: false, error: 'Unit ID tidak ditemukan' });
+        res
+          .status(400)
+          .json({ success: false, error: "Unit ID tidak ditemukan" });
         return;
       }
       const data = await babyService.getBabiesByUnit(unitId);
@@ -37,7 +39,9 @@ export const babyController = {
       const unitId = req.user?.unitId;
 
       if (!name || !bedNumber || !dateOfBirth || !parentName || !unitId) {
-        res.status(400).json({ success: false, error: 'Semua field wajib diisi' });
+        res
+          .status(400)
+          .json({ success: false, error: "Semua field wajib diisi" });
         return;
       }
 
@@ -66,6 +70,44 @@ export const babyController = {
     } catch (err: any) {
       const response: ApiResponse = { success: false, error: err.message };
       res.status(500).json(response);
+    }
+  },
+  async dischargeBaby(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const unitId = req.user?.unitId;
+
+      if (!unitId) {
+        res.status(400).json({
+          success: false,
+          error: "Unit ID tidak ditemukan",
+        });
+        return;
+      }
+
+      const data = await babyService.dischargeBaby(id as string, unitId);
+
+      const response: ApiResponse = {
+        success: true,
+        data,
+      };
+
+      res.json(response);
+    } catch (err: any) {
+      let status = 500;
+
+      if (err.message === "Bayi tidak ditemukan") {
+        status = 404;
+      } else if (err.message === "Bayi bukan bagian dari unit pengasuh") {
+        status = 403;
+      }
+
+      const response: ApiResponse = {
+        success: false,
+        error: err.message,
+      };
+
+      res.status(status).json(response);
     }
   },
 };

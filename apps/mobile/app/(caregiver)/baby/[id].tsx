@@ -95,20 +95,49 @@ export default function BabyDetailScreen() {
   };
 
   const handleDischarge = () => {
+    if (!id) {
+      Alert.alert("Gagal", "ID bayi tidak ditemukan.");
+      return;
+    }
+
     Alert.alert(
       "Keluarkan Pasien",
       `Yakin ingin mengeluarkan ${baby?.name} dari sistem? Semua relasi perangkat akan diputus.`,
       [
-        { text: "Batal", style: "cancel" },
+        {
+          text: "Batal",
+          style: "cancel",
+        },
         {
           text: "Keluarkan",
           style: "destructive",
           onPress: async () => {
             try {
-              Alert.alert("Sukses", "Pasien berhasil dikeluarkan.");
-              router.replace("/(caregiver)/dashboard");
-            } catch (err) {
-              Alert.alert("Gagal", "Tidak dapat mengeluarkan pasien saat ini.");
+              await babyService.dischargeBaby(id);
+
+              Alert.alert(
+                "Sukses",
+                "Pasien berhasil dikeluarkan dari sistem.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      router.replace("/(caregiver)/dashboard");
+                    },
+                  },
+                ],
+              );
+            } catch (err: any) {
+              console.error(
+                "[BabyDetail] Gagal mengeluarkan pasien:",
+                err.response?.data || err,
+              );
+
+              Alert.alert(
+                "Gagal",
+                err.response?.data?.error ||
+                  "Tidak dapat mengeluarkan pasien saat ini.",
+              );
             }
           },
         },
