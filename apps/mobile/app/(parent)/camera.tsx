@@ -68,10 +68,12 @@ export default function CameraScreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
+  const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
 
   const babyId = user?.role === "parent" ? user.babyId : null;
   const focusedStatus = babyId ? state.statuses[babyId] : null;
-  const isDeviceOnline = focusedStatus?.deviceOnline ?? false;
+  const isDeviceOnline =
+    focusedStatus?.deviceOnline ?? apiDeviceOnline ?? false;
 
   useEffect(() => {
     if (babyId) void fetchStreamUrl();
@@ -105,12 +107,17 @@ export default function CameraScreen() {
     setHasError(false);
     try {
       const response = await api.get(`/babies/${babyId}`);
-      const deviceId = response.data.data?.devices?.id;
+      const device = response.data.data?.devices;
+      setApiDeviceOnline(
+        typeof device?.is_online === "boolean" ? device.is_online : null,
+      );
+      const deviceId = device?.id;
       setStreamUrl(
         deviceId ? await deviceService.getStreamUrl(deviceId) : null,
       );
     } catch {
       setStreamUrl(null);
+      setApiDeviceOnline(null);
       setHasError(true);
     } finally {
       setIsLoading(false);

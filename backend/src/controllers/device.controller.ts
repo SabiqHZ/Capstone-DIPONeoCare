@@ -14,11 +14,37 @@ function isIsoTimestamp(value: unknown): value is string {
 
 function canAccessDevice(
   user: JwtPayload | undefined,
-  device: { baby_id: string | null; unit_id: string | null },
+  device: {
+    baby_id: string | null;
+    unit_id: string | null;
+    baby_unit_id: string | null;
+  },
 ): boolean {
   if (user?.role === "parent") return device.baby_id === user.babyId;
-  if (user?.role === "nurse") return device.unit_id === user.unitId;
+  if (user?.role === "nurse") {
+    return (device.baby_unit_id ?? device.unit_id) === user.unitId;
+  }
   return false;
+}
+
+function sendDeviceAccessError(
+  req: AuthRequest | Request,
+  res: Response,
+  device: { baby_id: string | null },
+): void {
+  if (!device.baby_id) {
+    res.status(409).json({
+      success: false,
+      error: "Perangkat belum dipair ke bayi",
+    });
+    return;
+  }
+
+  const error =
+    (req as AuthRequest).user?.role === "parent"
+      ? "Perangkat tidak terhubung ke bayi pada akun ini"
+      : "Perangkat berada di luar unit pengasuh ini";
+  res.status(403).json({ success: false, error });
 }
 
 export const deviceController = {
@@ -253,8 +279,8 @@ export const deviceController = {
         });
         return;
       }
-      if (!canAccessDevice(req.user, device)) {
-        res.status(403).json({ success: false, error: "Akses ditolak" });
+      if (!device.baby_id || !canAccessDevice(req.user, device)) {
+        sendDeviceAccessError(req, res, device);
         return;
       }
 
@@ -300,8 +326,8 @@ export const deviceController = {
           .json({ success: false, error: "Perangkat tidak ditemukan" });
         return;
       }
-      if (!canAccessDevice(user, device)) {
-        res.status(403).json({ success: false, error: "Akses ditolak" });
+      if (!device.baby_id || !canAccessDevice(user, device)) {
+        sendDeviceAccessError(req, res, device);
         return;
       }
 
