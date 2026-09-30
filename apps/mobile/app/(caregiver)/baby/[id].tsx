@@ -183,27 +183,27 @@ export default function BabyDetailScreen() {
   const isDevicePaired = !!baby.devices || !!realtimeStatus;
 
   // INJEKSI REALTIME: Memaksa UI menggunakan detak jantung dari Socket.io
-  const isDeviceOnline = realtimeStatus
-    ? realtimeStatus.deviceOnline
-    : (baby.devices?.is_online ?? false);
-  const isCrying = realtimeStatus
-    ? realtimeStatus.isCrying
-    : (baby.baby_statuses?.is_crying ?? false);
-  const faceCovered = realtimeStatus
-    ? realtimeStatus.faceAnomaly !== "none"
-    : Boolean(
-        baby.baby_statuses?.face_anomaly &&
-        baby.baby_statuses.face_anomaly !== "none",
-      );
-  const activity = realtimeStatus
-    ? realtimeStatus.activity
-    : (baby.baby_statuses?.activity ?? "sleeping");
-  const cryingDurationSec = realtimeStatus
-    ? realtimeStatus.cryingDurationSec
-    : (baby.baby_statuses?.crying_duration_sec ?? 0);
-  const lastUpdated = realtimeStatus
-    ? realtimeStatus.lastUpdated
-    : (baby.baby_statuses?.updated_at ?? new Date().toISOString());
+  const isDeviceOnline =
+    realtimeStatus?.deviceOnline ?? baby.devices?.is_online ?? false;
+
+  const isCrying =
+    realtimeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null;
+
+  const faceAnomaly =
+    realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+
+  const faceCovered = faceAnomaly != null && faceAnomaly !== "none";
+
+  const activity =
+    realtimeStatus?.activity ?? baby.baby_statuses?.activity ?? null;
+
+  const cryingDurationSec =
+    realtimeStatus?.cryingDurationSec ??
+    baby.baby_statuses?.crying_duration_sec ??
+    null;
+
+  const lastUpdated =
+    realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at ?? null;
 
   // IP perangkat diperbarui saat register/heartbeat. Endpoint MJPEG selalu /stream.
   const deviceAddress = baby.devices?.local_ip?.trim();
@@ -377,22 +377,32 @@ export default function BabyDetailScreen() {
                   <View
                     style={[
                       styles.aiCard,
-                      isCrying ? styles.cryActive : styles.normalCard,
+                      isCrying === true ? styles.cryActive : styles.normalCard,
                     ]}
                   >
                     <Icon
                       name={
-                        isCrying
+                        isCrying === true
                           ? "emoticon-cry-outline"
-                          : "emoticon-happy-outline"
+                          : isCrying === false
+                            ? "emoticon-happy-outline"
+                            : "help-circle-outline"
                       }
                       library="material"
                       size={24}
-                      color={isCrying ? Colors.danger : Colors.primary}
+                      color={isCrying === true ? Colors.danger : Colors.primary}
                     />
                     <Text style={styles.aiCardLabel}>Suara</Text>
                     <Text style={styles.aiCardValue}>
-                      {isCrying ? `Menangis (${cryingDurationSec}s)` : "Tenang"}
+                      {isCrying === null
+                        ? "Menunggu data AI"
+                        : isCrying
+                          ? `Menangis${
+                              cryingDurationSec != null
+                                ? ` (${cryingDurationSec}s)`
+                                : ""
+                            }`
+                          : "Tenang"}
                     </Text>
                   </View>
 
@@ -423,17 +433,21 @@ export default function BabyDetailScreen() {
                     />
                     <Text style={styles.aiCardLabel}>Aktivitas</Text>
                     <Text style={styles.aiCardValue}>
-                      {activity === "sleeping"
-                        ? "Tidur"
-                        : activity === "awake"
-                          ? "Bangun"
-                          : "Menangis"}
+                      {activity === null
+                        ? "Menunggu data AI"
+                        : activity === "sleeping"
+                          ? "Tidur"
+                          : activity === "awake"
+                            ? "Bangun"
+                            : "Menangis"}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.lastUpdated}>
                   Diperbarui:{" "}
-                  {new Date(lastUpdated).toLocaleTimeString("id-ID")}
+                  {lastUpdated
+                    ? new Date(lastUpdated).toLocaleTimeString("id-ID")
+                    : "Menunggu data AI"}
                 </Text>
               </>
             )}

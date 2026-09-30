@@ -48,11 +48,13 @@ const activityLabel: Record<string, string> = {
   sleeping: "Tidur",
   awake: "Bangun",
   crying: "Menangis",
+  unknown: "Menunggu data AI",
 };
 const activityColor: Record<string, string> = {
   sleeping: Colors.primary,
   awake: Colors.warning,
   crying: Colors.danger,
+  unknown: Colors.textMuted,
 };
 
 function BabyCard({
@@ -69,21 +71,24 @@ function BabyCard({
   const isOnline = activeStatus
     ? activeStatus.deviceOnline
     : (baby.devices?.is_online ?? false);
-  const isCrying = activeStatus
-    ? activeStatus.isCrying
-    : (baby.baby_statuses?.is_crying ?? false);
-  const activity = activeStatus
-    ? activeStatus.activity
-    : (baby.baby_statuses?.activity ?? "sleeping");
-  const faceCovered = activeStatus
-    ? activeStatus.faceAnomaly !== "none"
-    : Boolean(
-        baby.baby_statuses?.face_anomaly &&
-        baby.baby_statuses.face_anomaly !== "none",
-      );
-  const cryingSec = activeStatus
-    ? activeStatus.cryingDurationSec
-    : (baby.baby_statuses?.crying_duration_sec ?? 0);
+
+  const isCrying =
+    activeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null;
+
+  const activity =
+    activeStatus?.activity ?? baby.baby_statuses?.activity ?? null;
+
+  const faceAnomaly =
+    activeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+
+  const faceCovered = faceAnomaly != null && faceAnomaly !== "none";
+
+  const cryingSec =
+    activeStatus?.cryingDurationSec ??
+    baby.baby_statuses?.crying_duration_sec ??
+    null;
+
+  const activityKey = activity ?? "unknown";
 
   const borderColor = faceCovered
     ? "#7C3AED"
@@ -153,13 +158,18 @@ function BabyCard({
         <View
           style={[
             styles.alertBadge,
-            { backgroundColor: activityColor[activity] + "22" },
+            {
+              backgroundColor: activityColor[activityKey] + "22",
+            },
           ]}
         >
           <Text
-            style={[styles.alertBadgeText, { color: activityColor[activity] }]}
+            style={[
+              styles.alertBadgeText,
+              { color: activityColor[activityKey] },
+            ]}
           >
-            {activityLabel[activity] ?? "Tidak Diketahui"}
+            {activityLabel[activityKey]}
           </Text>
         </View>
 
@@ -172,7 +182,8 @@ function BabyCard({
               color={Colors.danger}
             />
             <Text style={[styles.statText, { color: Colors.danger }]}>
-              Menangis {`${cryingSec}s`}
+              Menangis
+              {cryingSec != null ? ` ${cryingSec}s` : ""}
             </Text>
           </View>
         ) : null}

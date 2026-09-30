@@ -24,6 +24,7 @@ type FinalizedStatus = {
   anomalyType: string | null;
   updatedAt: string;
 };
+const ANOMALY_CONTINUITY_GAP_MS = 1_500;
 
 export const inferenceService = {
   async saveVisionResult(device: DeviceContext, payload: VisionResultPayload) {
@@ -171,14 +172,22 @@ export const inferenceService = {
 
   async trackAnomaly(device: DeviceContext, payload: VisionResultPayload) {
     if (!device.baby_id) return null;
+
     const { data: active, error } = await supabaseAdmin
       .from("anomaly_events")
       .select("*")
       .eq("device_id", device.id)
       .is("resolved_at", null)
       .maybeSingle();
-    if (error) throw new Error(error.message);
 
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    /*
+     * Tidak ada anomaly pada frame saat ini.
+     * Kalau sebelumnya ada event aktif, event dianggap selesai.
+     */
     if (!payload.anomaly.detected) {
       if (active) {
         const { error: resolveError } = await supabaseAdmin
@@ -188,19 +197,91 @@ export const inferenceService = {
             last_detected_at: payload.timestamp,
           })
           .eq("id", active.id);
-        if (resolveError) throw new Error(resolveError.message);
+
+        if (resolveError) {
+          throw new Error(resolveError.message);
+        }
       }
+
       return null;
     }
 
+    const currentDetectedAt = Date.parse(payload.timestamp);
+
+    if (Number.isNaN(currentDetectedAt)) {
+      throw new Error("Timestamp anomaly tidak valid");
+    }
+
     let event = active;
-    if (!event || event.anomaly_type !== payload.anomaly.type) {
-      if (event) {
-        await supabaseAdmin
-          .from("anomaly_events")
-          .update({ resolved_at: payload.timestamp })
-          .eq("id", event.id);
+
+    /*
+     * Kalau event aktif ada dan jenis anomaly sama,
+     * cek apakah detection masih kontinu.
+     */
+    if (event && event.anomaly_type === payload.anomaly.type) {
+      const lastDetectedAt = Date.parse(event.last_detected_at);
+
+      if (Number.isNaN(lastDetectedAt)) {
+        throw new Error("last_detected_at anomaly tidak valid");
       }
+
+      const gapMs = currentDetectedAt - lastDetectedAt;
+
+      /*
+       * Callback lama / out-of-order.
+       * Jangan mengubah event menggunakan timestamp yang
+       * lebih lama daripada detection terakhir.
+       */
+      if (gapMs < 0) {
+        console.warn(
+          `[Anomaly] Ignoring out-of-order detection for ${device.id}`,
+        );
+
+        return null;
+      }
+
+      /*
+       * Gap terlalu besar:
+       * event lama selesai dan detection sekarang menjadi
+       * event baru.
+       */
+      if (gapMs > ANOMALY_CONTINUITY_GAP_MS) {
+        const { error: resolveError } = await supabaseAdmin
+          .from("anomaly_events")
+          .update({
+            resolved_at: new Date(
+              lastDetectedAt + ANOMALY_CONTINUITY_GAP_MS,
+            ).toISOString(),
+          })
+          .eq("id", event.id);
+
+        if (resolveError) {
+          throw new Error(resolveError.message);
+        }
+
+        event = null;
+      }
+    }
+
+    /*
+     * Tidak ada event aktif, jenis anomaly berubah,
+     * atau event lama sudah diputus karena gap.
+     * Buat event baru.
+     */
+    if (!event || event.anomaly_type !== payload.anomaly.type) {
+      if (event && event.anomaly_type !== payload.anomaly.type) {
+        const { error: resolveError } = await supabaseAdmin
+          .from("anomaly_events")
+          .update({
+            resolved_at: payload.timestamp,
+          })
+          .eq("id", event.id);
+
+        if (resolveError) {
+          throw new Error(resolveError.message);
+        }
+      }
+
       const { data, error: insertError } = await supabaseAdmin
         .from("anomaly_events")
         .insert({
@@ -212,37 +293,71 @@ export const inferenceService = {
         })
         .select()
         .single();
-      if (insertError) throw new Error(insertError.message);
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
       event = data;
     } else {
+      /*
+       * Detection masih kontinu.
+       * Update last_detected_at.
+       */
       const { data, error: updateError } = await supabaseAdmin
         .from("anomaly_events")
-        .update({ last_detected_at: payload.timestamp })
+        .update({
+          last_detected_at: payload.timestamp,
+        })
         .eq("id", event.id)
         .select()
         .single();
-      if (updateError) throw new Error(updateError.message);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
       event = data;
     }
 
+    /*
+     * Hitung durasi hanya dari event yang benar-benar
+     * kontinu.
+     */
     const durationSeconds =
       (Date.parse(event.last_detected_at) - Date.parse(event.started_at)) /
       1_000;
+
+    /*
+     * Alert hanya boleh dibuat setelah anomaly kontinu
+     * mencapai 15 detik.
+     */
     if (durationSeconds >= 15 && !event.alert_sent_at) {
       const alert = await alertService.createAlert({
         babyId: device.baby_id,
         type: "ANOMALY_DETECTED",
-        message: `${event.anomaly_type} terdeteksi di area bayi selama ${Math.floor(durationSeconds)} detik`,
+        message:
+          `${event.anomaly_type} terdeteksi di area bayi ` +
+          `selama ${Math.floor(durationSeconds)} detik`,
         severity: "critical",
       });
+
       if (alert) {
-        await supabaseAdmin
+        const { error: alertUpdateError } = await supabaseAdmin
           .from("anomaly_events")
-          .update({ alert_sent_at: new Date().toISOString() })
+          .update({
+            alert_sent_at: new Date().toISOString(),
+          })
           .eq("id", event.id);
+
+        if (alertUpdateError) {
+          throw new Error(alertUpdateError.message);
+        }
+
         return alert;
       }
     }
+
     return null;
   },
 

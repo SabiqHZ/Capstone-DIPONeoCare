@@ -125,10 +125,9 @@ export default function CameraScreen() {
     return "—";
   };
 
-  const anomalyType = focusedStatus?.faceAnomaly ?? "none";
-  const hasAnomaly = anomalyType !== "none";
-  // MJPEG is an image stream, so render it inside an HTML image element rather
-  // than asking the WebView to navigate to the raw multipart response.
+  const anomalyType = focusedStatus?.faceAnomaly ?? null;
+
+  const hasAnomaly = anomalyType != null && anomalyType !== "none";
   const streamHtml = streamUrl
     ? `<!doctype html><html><body style="margin:0;background:#111827;display:flex;align-items:center;justify-content:center;height:100vh"><img src=${JSON.stringify(streamUrl)} style="width:100%;height:100%;object-fit:contain" /></body></html>`
     : "";
@@ -272,9 +271,11 @@ export default function CameraScreen() {
             >
               {!isDeviceOnline || !focusedStatus
                 ? "—"
-                : hasAnomaly
-                  ? anomalyType
-                  : "Terdeteksi"}
+                : anomalyType == null
+                  ? "Menunggu data AI"
+                  : hasAnomaly
+                    ? anomalyType
+                    : "Terdeteksi"}
             </Text>
           </View>
         </View>

@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { Baby } from "../types";
+import { Baby, RegisteredBaby } from "../types";
 
 export const babyService = {
   getBabies: async (): Promise<any[]> => {
@@ -17,7 +17,7 @@ export const babyService = {
     bedNumber: string;
     dateOfBirth: string;
     parentName: string;
-  }): Promise<Baby> => {
+  }): Promise<RegisteredBaby> => {
     const res = await api.post("/babies", payload);
     return res.data.data;
   },

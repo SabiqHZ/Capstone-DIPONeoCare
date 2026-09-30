@@ -3,6 +3,42 @@ import { AuthRequest, ApiResponse } from "../types";
 import { alertService } from "../services/alert.service";
 
 export const alertController = {
+  async getAll(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const user = req.user;
+
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+        return;
+      }
+
+      const rawLimit = Number(req.query.limit ?? 50);
+
+      const limit = Number.isFinite(rawLimit)
+        ? Math.min(Math.max(Math.floor(rawLimit), 1), 50)
+        : 50;
+
+      const data = await alertService.getAlertsForUser(user, limit);
+
+      const response: ApiResponse = {
+        success: true,
+        data,
+      };
+
+      res.json(response);
+    } catch (err: any) {
+      const response: ApiResponse = {
+        success: false,
+        error: err.message,
+      };
+
+      res.status(500).json(response);
+    }
+  },
+
   async acknowledge(req: AuthRequest, res: Response): Promise<void> {
     try {
       const user = req.user;

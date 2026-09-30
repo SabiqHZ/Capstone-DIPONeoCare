@@ -27,23 +27,35 @@ export interface BabyStatus {
   babyId: string;
   babyName: string;
   bedNumber: string;
-  isCrying: boolean;
-  cryingDurationSec: number;
-  alertLevel: AlertLevel;
+  isCrying: boolean | null;
+  cryingDurationSec: number | null;
+  alertLevel: AlertLevel | null;
   deviceOnline: boolean;
-  lastUpdated: string;
-  activity: BabyActivity;
-  soundClass: SoundClass;
-  soundConfidence: number;
-  faceAnomaly?: FaceAnomaly;
-  faceDetected?: boolean;
-  bodyDetected?: boolean;
+  lastUpdated: string | null;
+  activity: BabyActivity | null;
+  soundClass: SoundClass | null;
+  soundConfidence: number | null;
+
+  faceAnomaly?: FaceAnomaly | null;
+  faceDetected?: boolean | null;
+  bodyDetected?: boolean | null;
 }
 
 export interface Baby {
   id: string;
   name: string;
   bed_number: string;
+  dateOfBirth: string;
+  parentName: string;
+  uniqueCode: string;
+  deviceId: string | null;
+  unitId: string;
+  createdAt: string;
+}
+export interface RegisteredBaby {
+  id: string;
+  name: string;
+  bedNumber: string;
   dateOfBirth: string;
   parentName: string;
   uniqueCode: string;
@@ -61,7 +73,8 @@ export interface DeviceConfig {
 export type NotificationType =
   | "CRYING_DETECTED"
   | "DEVICE_OFFLINE"
-  | "FACE_COVERED";
+  | "FACE_COVERED"
+  | "ANOMALY_DETECTED";
 
 export interface AlertNotification {
   id: string;

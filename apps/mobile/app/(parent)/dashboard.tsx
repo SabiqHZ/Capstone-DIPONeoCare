@@ -266,10 +266,10 @@ export default function ParentDashboard() {
         {status && (
           <ActivityCard
             key={`${status.activity}-${status.soundClass}-${status.lastUpdated}`}
-            activity={status.activity ?? "sleeping"}
-            soundClass={status.soundClass ?? "not_crying"}
-            soundConfidence={status.soundConfidence ?? 0}
-            faceAnomaly={status.faceAnomaly ?? "none"}
+            activity={status.activity}
+            soundClass={status.soundClass}
+            soundConfidence={status.soundConfidence}
+            faceAnomaly={status.faceAnomaly}
           />
         )}
 

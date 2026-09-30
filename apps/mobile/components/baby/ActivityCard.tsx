@@ -5,10 +5,10 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 
 interface Props {
-  activity: BabyActivity;
-  soundClass: SoundClass;
-  soundConfidence: number;
-  faceAnomaly?: FaceAnomaly;
+  activity: BabyActivity | null;
+  soundClass: SoundClass | null;
+  soundConfidence: number | null;
+  faceAnomaly?: FaceAnomaly | null;
 }
 
 const activityConfig = {
@@ -20,6 +20,7 @@ const activityConfig = {
     icon: "sleep",
     iconLib: "material" as const,
   },
+
   awake: {
     label: "Bangun",
     desc: "Bayi sedang terjaga",
@@ -28,6 +29,7 @@ const activityConfig = {
     icon: "eye-outline",
     iconLib: "ionicons" as const,
   },
+
   crying: {
     label: "Menangis",
     desc: "Bayi terdeteksi menangis",
@@ -35,6 +37,15 @@ const activityConfig = {
     bg: Colors.dangerLight,
     icon: "emoticon-cry-outline",
     iconLib: "material" as const,
+  },
+
+  unknown: {
+    label: "Menunggu data AI",
+    desc: "Belum ada hasil analisis aktivitas bayi",
+    color: Colors.textMuted,
+    bg: Colors.borderLight,
+    icon: "help-circle-outline",
+    iconLib: "ionicons" as const,
   },
 };
 
@@ -44,10 +55,17 @@ const soundConfig = {
     color: Colors.danger,
     bg: Colors.dangerLight,
   },
+
   not_crying: {
     label: "Tidak Menangis",
     color: Colors.primary,
     bg: Colors.primaryLight,
+  },
+
+  unknown: {
+    label: "Menunggu hasil audio AI",
+    color: Colors.textMuted,
+    bg: Colors.borderLight,
   },
 };
 
@@ -57,8 +75,11 @@ export function ActivityCard({
   soundConfidence,
   faceAnomaly,
 }: Props) {
-  const actCfg = activityConfig[activity];
-  const sndCfg = soundConfig[soundClass];
+  const activityKey = activity ?? "unknown";
+  const soundKey = soundClass ?? "unknown";
+
+  const actCfg = activityConfig[activityKey];
+  const sndCfg = soundConfig[soundKey];
 
   return (
     <View style={[styles.card, { backgroundColor: actCfg.bg }]}>
@@ -83,7 +104,13 @@ export function ActivityCard({
       {/* Status suara */}
       <View style={[styles.soundBadge, { backgroundColor: sndCfg.bg }]}>
         <Icon
-          name={soundClass === "crying" ? "volume-high" : "volume-mute"}
+          name={
+            soundClass === "crying"
+              ? "volume-high"
+              : soundClass === "not_crying"
+                ? "volume-mute"
+                : "help-circle-outline"
+          }
           library="ionicons"
           size={14}
           color={sndCfg.color}
@@ -91,7 +118,9 @@ export function ActivityCard({
         <Text style={[styles.soundLabel, { color: sndCfg.color }]}>
           {sndCfg.label}
         </Text>
-        {soundClass === "crying" && soundConfidence > 0 ? (
+        {soundClass === "crying" &&
+        typeof soundConfidence === "number" &&
+        soundConfidence > 0 ? (
           <Text style={[styles.soundConf, { color: sndCfg.color }]}>
             {Math.round(soundConfidence * 100)}%
           </Text>

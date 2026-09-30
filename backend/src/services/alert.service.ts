@@ -39,7 +39,51 @@ export const alertService = {
     if (error) throw new Error(error.message);
     return data;
   },
+  async getAlertsForUser(user: JwtPayload, limit = 50) {
+    let babyIds: string[] = [];
 
+    if (user.role === "parent") {
+      if (!user.babyId) {
+        throw new Error("Baby ID parent tidak ditemukan");
+      }
+
+      babyIds = [user.babyId];
+    }
+
+    if (user.role === "nurse") {
+      if (!user.unitId) {
+        throw new Error("Unit ID pengasuh tidak ditemukan");
+      }
+
+      const { data: babies, error: babiesError } = await supabaseAdmin
+        .from("babies")
+        .select("id")
+        .eq("unit_id", user.unitId);
+
+      if (babiesError) {
+        throw new Error(babiesError.message);
+      }
+
+      babyIds = (babies ?? []).map((baby) => baby.id);
+    }
+
+    if (babyIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("alert_logs")
+      .select("id, baby_id, type, message, severity, created_at, acknowledged")
+      .in("baby_id", babyIds)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data ?? [];
+  },
   async acknowledgeAlert(alertId: string, user: JwtPayload) {
     const { data: alert, error: alertError } = await supabaseAdmin
       .from("alert_logs")

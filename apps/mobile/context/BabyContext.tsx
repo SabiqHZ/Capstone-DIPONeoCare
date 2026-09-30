@@ -12,6 +12,7 @@ import { BabyStatus, AlertNotification } from "../types";
 import { useAuthStore } from "../stores/auth.store";
 import { notificationService } from "../services/notification.service";
 import api from "../services/api"; // WAJIB DI-IMPORT UNTUK INITIAL FETCH
+import { alertService } from "../services/alert.service";
 
 // ── State ─────────────────────────────────────────────────────────────
 interface BabyState {
@@ -34,6 +35,7 @@ type BabyAction =
     }
   | { type: "ADD_ALERT"; payload: AlertNotification }
   | { type: "ACK_ALERT"; payload: string }
+  | { type: "SET_ALERTS"; payload: AlertNotification[] }
   | { type: "SET_FOCUSED"; payload: string }
   | { type: "CLEAR" };
 
@@ -50,11 +52,23 @@ function babyReducer(state: BabyState, action: BabyAction): BabyState {
           } as BabyStatus,
         },
       };
-    case "ADD_ALERT":
+    case "ADD_ALERT": {
+      const existingAlerts = state.alerts.filter(
+        (alert) => alert.id !== action.payload.id,
+      );
+
       return {
         ...state,
-        alerts: [action.payload, ...state.alerts].slice(0, 50),
+        alerts: [action.payload, ...existingAlerts].slice(0, 50),
       };
+    }
+
+    case "SET_ALERTS":
+      return {
+        ...state,
+        alerts: action.payload.slice(0, 50),
+      };
+
     case "ACK_ALERT":
       return {
         ...state,
@@ -97,6 +111,28 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  const loadAlerts = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      console.log("[BabyContext] Memuat alert dari backend...");
+
+      const alerts = await alertService.getAlerts(50);
+
+      dispatchRef.current({
+        type: "SET_ALERTS",
+        payload: alerts,
+      });
+
+      console.log(`[BabyContext] ${alerts.length} alert berhasil dimuat`);
+    } catch (error: any) {
+      console.error(
+        "[BabyContext] Gagal memuat alert:",
+        error?.response?.data || error?.message || error,
+      );
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token) {
       socketInstance?.disconnect();
@@ -104,6 +140,8 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
       dispatchRef.current({ type: "CLEAR" });
       return;
     }
+
+    void loadAlerts();
 
     if (socketInstance?.connected) return;
     socketInstance?.disconnect();
@@ -119,11 +157,13 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
 
     socketInstance.on("connect", () => {
       console.log("[Socket] Connected");
+
       if (role === "caregiver" && unitId) {
         socketInstance!.emit("subscribe:unit", unitId);
       } else if (role === "parent" && babyId) {
         socketInstance!.emit("subscribe:baby", babyId);
       }
+      void loadAlerts();
     });
 
     socketInstance.on(
@@ -180,33 +220,56 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // ULTIMATE FALLBACK: Jika Supabase pelit dan mereturn null untuk relasi,
-      // kita JANGAN membekukan layar. Kita buat status default buatan!
-      const statusData = babyData.baby_statuses || {};
-      const deviceData = babyData.devices || {};
+      const statusData = babyData.baby_statuses ?? null;
+      const deviceData = babyData.devices ?? null;
 
-      if (!babyData.baby_statuses) {
-        console.warn(
-          `[BabyContext-DEBUG] ⚠️ PERINGATAN: baby_statuses NULL dari backend (Mungkin kena blokir RLS Supabase). Menggunakan status default.`,
-        );
+      if (!statusData) {
+        console.warn("[BabyContext-DEBUG] Belum ada hasil AI untuk bayi ini.");
       }
+
+      const rawSoundConfidence = statusData?.sound_confidence;
+
+      const parsedSoundConfidence =
+        rawSoundConfidence != null ? Number(rawSoundConfidence) : null;
+
+      const soundConfidence =
+        parsedSoundConfidence != null && Number.isFinite(parsedSoundConfidence)
+          ? parsedSoundConfidence
+          : null;
 
       const initialStatus: BabyStatus = {
         babyId: id,
         babyName: babyData.name,
         bedNumber: babyData.bed_number || babyData.bedNumber || "-",
 
-        // Gunakan data asli jika ada, jika null pakai default yang aman
-        isCrying: statusData.is_crying ?? false,
-        cryingDurationSec: statusData.crying_duration_sec ?? 0,
-        alertLevel: statusData.alert_level ?? "normal",
-        deviceOnline: deviceData.is_online ?? false,
-        lastUpdated: statusData.updated_at || new Date().toISOString(),
-        activity: statusData.activity ?? "sleeping",
-        soundClass: statusData.sound_class ?? "not_crying",
-        soundConfidence: Number(statusData.sound_confidence) || 1,
-        faceAnomaly: statusData.face_anomaly ?? "none",
+        // null = belum ada hasil AI
+        isCrying: statusData?.is_crying ?? null,
+        cryingDurationSec: statusData?.crying_duration_sec ?? null,
+        alertLevel: statusData?.alert_level ?? null,
+
+        // status hardware tetap boleh berasal dari device
+        deviceOnline: deviceData?.is_online ?? false,
+
+        // Jangan membuat timestamp palsu
+        lastUpdated: statusData?.updated_at ?? null,
+
+        // Jangan menganggap bayi tidur jika AI belum memberi hasil
+        activity: statusData?.activity ?? null,
+
+        // Jangan menganggap bayi tidak menangis jika AI belum memberi hasil
+        soundClass: statusData?.sound_class ?? null,
+
+        // 0 harus tetap 0
+        soundConfidence,
+
+        // null berarti belum ada hasil deteksi anomaly
+        faceAnomaly: statusData?.face_anomaly ?? null,
       };
+
+      dispatch({
+        type: "SET_STATUS",
+        payload: initialStatus,
+      });
 
       dispatch({ type: "SET_STATUS", payload: initialStatus });
       console.log(

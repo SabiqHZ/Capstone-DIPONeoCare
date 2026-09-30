@@ -7,6 +7,8 @@ const router = Router();
 
 router.use(authMiddleware);
 
+router.get("/", requireRole("nurse", "parent"), alertController.getAll);
+
 router.patch(
   "/:id/acknowledge",
   requireRole("nurse", "parent"),

@@ -18,7 +18,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import { babyService } from "../../services/baby.service";
 import api from "../../services/api"; // Pastikan path ini benar sesuai strukturmu
-import { Baby } from "../../types";
+import { RegisteredBaby } from "../../types";
 
 interface BabyForm {
   name: string;
@@ -45,7 +45,9 @@ export default function RegisterBabyScreen() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [registeredBaby, setRegisteredBaby] = useState<Baby | null>(null);
+  const [registeredBaby, setRegisteredBaby] = useState<RegisteredBaby | null>(
+    null,
+  );
 
   // State untuk Dropdown Kamera
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
@@ -172,7 +174,7 @@ export default function RegisterBabyScreen() {
                 color={Colors.textMuted}
               />
               <Text style={styles.babyInfoText}>
-                Tempat Tidur {registeredBaby.bed_number}
+                Tempat Tidur {registeredBaby.bedNumber}
               </Text>
             </View>
             <View style={styles.babyInfoRow}>
