@@ -30,12 +30,7 @@ app.use(helmet());
 app.use(cors({ origin: env.ALLOWED_ORIGINS }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-morgan.token("safe-url", (req) =>
-  (req.url ?? "").replace(/([?&]ticket=)[^&]+/g, "$1[redacted]"),
-);
-app.use(
-  morgan(":method :safe-url :status :res[content-length] - :response-time ms"),
-);
+app.use(morgan("dev"));
 
 // Attach io ke app supaya bisa diakses di controller nanti
 app.set("io", io);

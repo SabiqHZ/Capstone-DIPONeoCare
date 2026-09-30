@@ -6,15 +6,12 @@ export const deviceService = {
   async getDeviceStreamAccessById(deviceId: string) {
     const { data, error } = await supabaseAdmin
       .from("devices")
-      .select("id, baby_id, unit_id, babies(unit_id)")
+      .select("id, baby_id")
       .eq("id", deviceId)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    if (!data) return null;
-
-    const baby = Array.isArray(data.babies) ? data.babies[0] : data.babies;
-    return { ...data, baby_unit_id: baby?.unit_id ?? null };
+    return data;
   },
 
   async getDeviceConfigById(deviceId: string) {

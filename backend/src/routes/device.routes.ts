@@ -33,11 +33,6 @@ router.get(
   deviceController.available,
 );
 
-router.get(
-  "/:id/stream-ticket",
-  authMiddleware,
-  deviceController.createStreamTicket,
-);
 router.get("/:id/stream", deviceController.stream);
 
 router.get(

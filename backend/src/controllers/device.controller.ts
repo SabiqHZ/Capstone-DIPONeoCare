@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
-import { AuthRequest, JwtPayload } from "../types";
-import { env } from "../config/env";
+import { AuthRequest } from "../types";
 import { aiDispatchService } from "../services/ai-dispatch.service";
 import { deviceService } from "../services/device.service";
 import { deviceStreamService } from "../services/device-stream.service";
@@ -10,41 +8,6 @@ import { io } from "../app";
 
 function isIsoTimestamp(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
-}
-
-function canAccessDevice(
-  user: JwtPayload | undefined,
-  device: {
-    baby_id: string | null;
-    unit_id: string | null;
-    baby_unit_id: string | null;
-  },
-): boolean {
-  if (user?.role === "parent") return device.baby_id === user.babyId;
-  if (user?.role === "nurse") {
-    return (device.baby_unit_id ?? device.unit_id) === user.unitId;
-  }
-  return false;
-}
-
-function sendDeviceAccessError(
-  req: AuthRequest | Request,
-  res: Response,
-  device: { baby_id: string | null },
-): void {
-  if (!device.baby_id) {
-    res.status(409).json({
-      success: false,
-      error: "Perangkat belum dipair ke bayi",
-    });
-    return;
-  }
-
-  const error =
-    (req as AuthRequest).user?.role === "parent"
-      ? "Perangkat tidak terhubung ke bayi pada akun ini"
-      : "Perangkat berada di luar unit pengasuh ini";
-  res.status(403).json({ success: false, error });
 }
 
 export const deviceController = {
@@ -268,55 +231,8 @@ export const deviceController = {
       res.status(500).json({ success: false, error: err.message });
     }
   },
-  async createStreamTicket(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const deviceId = req.params.id as string;
-      const device = await deviceService.getDeviceStreamAccessById(deviceId);
-      if (!device) {
-        res.status(404).json({
-          success: false,
-          error: "Perangkat tidak ditemukan",
-        });
-        return;
-      }
-      if (!device.baby_id || !canAccessDevice(req.user, device)) {
-        sendDeviceAccessError(req, res, device);
-        return;
-      }
-
-      const ticket = jwt.sign(
-        { sub: req.user!.sub, role: req.user!.role, streamDeviceId: deviceId },
-        env.JWT_SECRET,
-        { expiresIn: "1h" },
-      );
-      res.json({ success: true, data: { ticket } });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  },
   async stream(req: Request, res: Response): Promise<void> {
     const deviceId = req.params.id as string;
-    const ticket = req.query.ticket;
-    if (typeof ticket !== "string") {
-      res
-        .status(401)
-        .json({ success: false, error: "Tiket stream wajib diisi" });
-      return;
-    }
-
-    let user: JwtPayload;
-    try {
-      user = jwt.verify(ticket, env.JWT_SECRET) as JwtPayload;
-    } catch {
-      res
-        .status(401)
-        .json({ success: false, error: "Tiket stream tidak valid" });
-      return;
-    }
-    if (user.streamDeviceId !== deviceId) {
-      res.status(403).json({ success: false, error: "Akses ditolak" });
-      return;
-    }
 
     try {
       const device = await deviceService.getDeviceStreamAccessById(deviceId);
@@ -326,8 +242,11 @@ export const deviceController = {
           .json({ success: false, error: "Perangkat tidak ditemukan" });
         return;
       }
-      if (!device.baby_id || !canAccessDevice(user, device)) {
-        sendDeviceAccessError(req, res, device);
+      if (!device.baby_id) {
+        res.status(409).json({
+          success: false,
+          error: "Perangkat belum dipair ke bayi",
+        });
         return;
       }
 

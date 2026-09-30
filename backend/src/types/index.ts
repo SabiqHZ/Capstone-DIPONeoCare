@@ -7,7 +7,6 @@ export interface JwtPayload {
   role: UserRole;
   unitId?: string; // untuk nurse
   babyId?: string; // untuk parent
-  streamDeviceId?: string;
   iat?: number;
   exp?: number;
 }
