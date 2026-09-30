@@ -140,7 +140,7 @@ export default function CameraScreen() {
 
   const hasAnomaly = anomalyType != null && anomalyType !== "none";
   const streamHtml = streamUrl
-    ? `<!doctype html><html><body style="margin:0;background:#111827;display:flex;align-items:center;justify-content:center;height:100vh"><img src=${JSON.stringify(streamUrl)} style="width:100%;height:100%;object-fit:contain" /></body></html>`
+    ? `<!doctype html><html><body style="margin:0;background:#111827;display:flex;align-items:center;justify-content:center;height:100vh"><img src=${JSON.stringify(streamUrl)} style="width:100%;height:100%;object-fit:contain" onerror="window.ReactNativeWebView.postMessage('stream-error')" /></body></html>`
     : "";
 
   return (
@@ -180,7 +180,7 @@ export default function CameraScreen() {
             <ActivityIndicator color="#1D9E75" size="large" />
             <Text style={styles.centerText}>Menghubungkan ke kamera...</Text>
           </View>
-        ) : !streamUrl || !isDeviceOnline ? (
+        ) : !streamUrl ? (
           <View style={styles.centerBox}>
             <Svg
               width="48"
@@ -239,6 +239,11 @@ export default function CameraScreen() {
             mixedContentMode="always"
             onError={() => setHasError(true)}
             onHttpError={() => setHasError(true)}
+            onMessage={(event) => {
+              if (event.nativeEvent.data === "stream-error") {
+                setHasError(true);
+              }
+            }}
             renderLoading={() => (
               <View style={styles.centerBox}>
                 <ActivityIndicator color="#1D9E75" />
