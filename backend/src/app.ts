@@ -30,7 +30,12 @@ app.use(helmet());
 app.use(cors({ origin: env.ALLOWED_ORIGINS }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan("dev"));
+morgan.token("safe-url", (req) =>
+  (req.url ?? "").replace(/([?&]ticket=)[^&]+/g, "$1[redacted]"),
+);
+app.use(
+  morgan(":method :safe-url :status :res[content-length] - :response-time ms"),
+);
 
 // Attach io ke app supaya bisa diakses di controller nanti
 app.set("io", io);
@@ -57,7 +62,9 @@ httpServer.listen(PORT, "0.0.0.0", () => {
 // dashboard truthful even when a device loses power or Wi-Fi unexpectedly.
 setInterval(() => {
   void (async () => {
-    const offlineDevices = await deviceService.markStaleDevicesOffline(env.DEVICE_OFFLINE_AFTER_SEC);
+    const offlineDevices = await deviceService.markStaleDevicesOffline(
+      env.DEVICE_OFFLINE_AFTER_SEC,
+    );
     for (const device of offlineDevices) {
       if (!device.baby_id) continue;
       const timestamp = new Date().toISOString();

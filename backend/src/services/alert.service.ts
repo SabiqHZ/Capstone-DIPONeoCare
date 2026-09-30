@@ -84,6 +84,7 @@ export const alertService = {
 
     return data ?? [];
   },
+
   async acknowledgeAlert(alertId: string, user: JwtPayload) {
     const { data: alert, error: alertError } = await supabaseAdmin
       .from("alert_logs")

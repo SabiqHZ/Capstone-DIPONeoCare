@@ -1,12 +1,24 @@
 import { Request, Response } from "express";
-import { AuthRequest } from "../types";
+import jwt from "jsonwebtoken";
+import { AuthRequest, JwtPayload } from "../types";
+import { env } from "../config/env";
 import { aiDispatchService } from "../services/ai-dispatch.service";
 import { deviceService } from "../services/device.service";
+import { deviceStreamService } from "../services/device-stream.service";
 import { broadcastBabyStatus } from "../socket/socket.handler";
 import { io } from "../app";
 
 function isIsoTimestamp(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function canAccessDevice(
+  user: JwtPayload | undefined,
+  device: { baby_id: string | null; unit_id: string | null },
+): boolean {
+  if (user?.role === "parent") return device.baby_id === user.babyId;
+  if (user?.role === "nurse") return device.unit_id === user.unitId;
+  return false;
 }
 
 export const deviceController = {
@@ -134,6 +146,8 @@ export const deviceController = {
         return;
       }
 
+      deviceStreamService.publishFrame(device.id, req.file.buffer);
+
       // The device gets an acknowledgement immediately; inference happens independently.
       void aiDispatchService
         .dispatch("vision", {
@@ -226,6 +240,99 @@ export const deviceController = {
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  },
+  async createStreamTicket(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const deviceId = req.params.id as string;
+      const device = await deviceService.getDeviceStreamAccessById(deviceId);
+      if (!device) {
+        res.status(404).json({
+          success: false,
+          error: "Perangkat tidak ditemukan",
+        });
+        return;
+      }
+      if (!canAccessDevice(req.user, device)) {
+        res.status(403).json({ success: false, error: "Akses ditolak" });
+        return;
+      }
+
+      const ticket = jwt.sign(
+        { sub: req.user!.sub, role: req.user!.role, streamDeviceId: deviceId },
+        env.JWT_SECRET,
+        { expiresIn: "1h" },
+      );
+      res.json({ success: true, data: { ticket } });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+  async stream(req: Request, res: Response): Promise<void> {
+    const deviceId = req.params.id as string;
+    const ticket = req.query.ticket;
+    if (typeof ticket !== "string") {
+      res
+        .status(401)
+        .json({ success: false, error: "Tiket stream wajib diisi" });
+      return;
+    }
+
+    let user: JwtPayload;
+    try {
+      user = jwt.verify(ticket, env.JWT_SECRET) as JwtPayload;
+    } catch {
+      res
+        .status(401)
+        .json({ success: false, error: "Tiket stream tidak valid" });
+      return;
+    }
+    if (user.streamDeviceId !== deviceId) {
+      res.status(403).json({ success: false, error: "Akses ditolak" });
+      return;
+    }
+
+    try {
+      const device = await deviceService.getDeviceStreamAccessById(deviceId);
+      if (!device) {
+        res
+          .status(404)
+          .json({ success: false, error: "Perangkat tidak ditemukan" });
+        return;
+      }
+      if (!canAccessDevice(user, device)) {
+        res.status(403).json({ success: false, error: "Akses ditolak" });
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "multipart/x-mixed-replace; boundary=frame",
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+        "X-Accel-Buffering": "no",
+      });
+
+      const writeFrame = (frame: Buffer) => {
+        if (res.destroyed) return;
+        res.write(
+          `--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`,
+        );
+        res.write(frame);
+        res.write("\r\n");
+      };
+      const unsubscribe = deviceStreamService.subscribe(deviceId, writeFrame);
+      const latestFrame = deviceStreamService.getLatestFrame(deviceId);
+      if (latestFrame) writeFrame(latestFrame);
+
+      res.on("close", unsubscribe);
+    } catch (err: any) {
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: err.message });
+      } else {
+        res.end();
+      }
     }
   },
   async getConfig(req: AuthRequest, res: Response): Promise<void> {

@@ -3,6 +3,17 @@ import { supabaseAdmin } from "../config/supabase";
 import { ActivityFlags, BabyActivity, DeviceContext } from "../types";
 
 export const deviceService = {
+  async getDeviceStreamAccessById(deviceId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .select("id, baby_id, unit_id")
+      .eq("id", deviceId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   async getDeviceConfigById(deviceId: string) {
     const { data, error } = await supabaseAdmin
       .from("devices")

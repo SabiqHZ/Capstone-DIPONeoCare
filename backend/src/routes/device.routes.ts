@@ -34,6 +34,13 @@ router.get(
 );
 
 router.get(
+  "/:id/stream-ticket",
+  authMiddleware,
+  deviceController.createStreamTicket,
+);
+router.get("/:id/stream", deviceController.stream);
+
+router.get(
   "/:id/config",
   authMiddleware,
   requireRole("nurse"),

@@ -18,6 +18,7 @@ import { Fonts } from "../../../constants/fonts";
 import { AlertBanner } from "../../../components/ui/AlertBanner";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { babyService } from "../../../services/baby.service";
+import { deviceService } from "../../../services/device.service";
 import {
   useBabyContext,
   useBabyStatusById,
@@ -53,6 +54,7 @@ export default function BabyDetailScreen() {
   const { setFocused, acknowledgeAlert } = useBabyContext();
 
   const [baby, setBaby] = useState<BabyDetail | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,26 @@ export default function BabyDetailScreen() {
     fetchBaby();
     if (id) setFocused(id);
   }, [id, setFocused, fetchBaby]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const deviceId = baby?.devices?.id;
+    setStreamUrl(null);
+    if (!deviceId) return;
+
+    void deviceService
+      .getStreamUrl(deviceId)
+      .then((url) => {
+        if (isCurrent) setStreamUrl(url);
+      })
+      .catch(() => {
+        if (isCurrent) setStreamUrl(null);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [baby?.devices?.id]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -205,16 +227,6 @@ export default function BabyDetailScreen() {
   const lastUpdated =
     realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at ?? null;
 
-  // IP perangkat diperbarui saat register/heartbeat. Endpoint MJPEG selalu /stream.
-  const deviceAddress = baby.devices?.local_ip?.trim();
-  const streamBaseUrl = deviceAddress
-    ? /^https?:\/\//i.test(deviceAddress)
-      ? deviceAddress
-      : `http://${deviceAddress}`
-    : null;
-  const streamUrl = streamBaseUrl
-    ? `${streamBaseUrl.replace(/\/+$/, "")}/stream`
-    : (baby.devices?.stream_url ?? null);
   const htmlContent = `
     <html>
       <body style="margin:0;padding:0;background-color:#111827;display:flex;justify-content:center;align-items:center;">
@@ -342,7 +354,7 @@ export default function BabyDetailScreen() {
                 <ActivityIndicator color={Colors.secondary} size="large" />
                 <Text style={styles.waitingText}>
                   {!streamUrl
-                    ? "Menunggu IP kamera terdaftar..."
+                    ? "Menunggu perangkat kamera terdaftar..."
                     : "Menunggu koneksi kamera..."}
                 </Text>
                 <Text style={styles.offlineText}>

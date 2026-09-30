@@ -13,6 +13,7 @@ import Svg, { Path } from "react-native-svg";
 import { useAuthStore } from "../../stores/auth.store";
 import { useBabyContext } from "../../context/BabyContext";
 import { api } from "../../services/api";
+import { deviceService } from "../../services/device.service";
 import { reportService } from "../../services/report.service";
 import { DailyReport } from "../../types";
 
@@ -103,8 +104,11 @@ export default function CameraScreen() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const response = await api.get(`/babies/${babyId}/stream-url`);
-      setStreamUrl(response.data.data?.streamUrl ?? null);
+      const response = await api.get(`/babies/${babyId}`);
+      const deviceId = response.data.data?.devices?.id;
+      setStreamUrl(
+        deviceId ? await deviceService.getStreamUrl(deviceId) : null,
+      );
     } catch {
       setStreamUrl(null);
       setHasError(true);
