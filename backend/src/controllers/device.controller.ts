@@ -236,12 +236,15 @@ export const deviceController = {
 
     try {
       const device = await deviceService.getDeviceStreamAccessById(deviceId);
+
       if (!device) {
-        res
-          .status(404)
-          .json({ success: false, error: "Perangkat tidak ditemukan" });
+        res.status(404).json({
+          success: false,
+          error: "Perangkat tidak ditemukan",
+        });
         return;
       }
+
       if (!device.baby_id) {
         res.status(409).json({
           success: false,
@@ -249,6 +252,8 @@ export const deviceController = {
         });
         return;
       }
+
+      console.log("[STREAM] client connected:", deviceId);
 
       res.writeHead(200, {
         "Content-Type": "multipart/x-mixed-replace; boundary=frame",
@@ -261,20 +266,48 @@ export const deviceController = {
 
       const writeFrame = (frame: Buffer) => {
         if (res.destroyed) return;
+
+        console.log("[STREAM] sending frame:", {
+          deviceId,
+          bytes: frame.length,
+        });
+
         res.write(
-          `--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`,
+          `--frame\r\n` +
+            `Content-Type: image/jpeg\r\n` +
+            `Content-Length: ${frame.length}\r\n\r\n`,
         );
+
         res.write(frame);
         res.write("\r\n");
       };
-      const unsubscribe = deviceStreamService.subscribe(deviceId, writeFrame);
-      const latestFrame = deviceStreamService.getLatestFrame(deviceId);
-      if (latestFrame) writeFrame(latestFrame);
 
-      res.on("close", unsubscribe);
+      const unsubscribe = deviceStreamService.subscribe(deviceId, writeFrame);
+
+      const latestFrame = deviceStreamService.getLatestFrame(deviceId);
+
+      console.log("[STREAM] initial frame:", {
+        deviceId,
+        hasFrame: Boolean(latestFrame),
+        bytes: latestFrame?.length ?? 0,
+      });
+
+      if (latestFrame) {
+        writeFrame(latestFrame);
+      }
+
+      res.on("close", () => {
+        console.log("[STREAM] client disconnected:", deviceId);
+        unsubscribe();
+      });
     } catch (err: any) {
+      console.error("[STREAM] error:", err);
+
       if (!res.headersSent) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
       } else {
         res.end();
       }
