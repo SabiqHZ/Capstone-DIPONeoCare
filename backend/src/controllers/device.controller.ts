@@ -135,9 +135,8 @@ export const deviceController = {
         return;
       }
 
-      deviceStreamService.publishFrame(device.id, req.file.buffer);
-
-      // The device gets an acknowledgement immediately; inference happens independently.
+      // The frame-upload API remains responsible for the AI pipeline only.
+      // Live streaming is published by the dedicated ESP32 WebSocket ingester.
       void aiDispatchService
         .dispatch("vision", {
           macAddress,
@@ -262,29 +261,100 @@ export const deviceController = {
         Pragma: "no-cache",
         Expires: "0",
         "X-Accel-Buffering": "no",
+        Connection: "close",
       });
+      res.flushHeaders();
+
+      let isWritingFrame = false;
+      let pendingLatestFrame: Buffer | undefined;
 
       const writeFrame = (frame: Buffer) => {
         if (res.destroyed) return;
 
-        console.log("[STREAM] sending frame:", {
-          deviceId,
-          bytes: frame.length,
-        });
+        if (isWritingFrame) {
+          pendingLatestFrame = frame;
+          return;
+        }
 
-        res.write(
-          `--frame\r\n` +
+        isWritingFrame = true;
+        const writeNext = () => {
+          const currentFrame = pendingLatestFrame ?? frame;
+          pendingLatestFrame = undefined;
+
+          if (res.destroyed) {
+            isWritingFrame = false;
+            return;
+          }
+
+          const header =
+            `--frame\r\n` +
             `Content-Type: image/jpeg\r\n` +
-            `Content-Length: ${frame.length}\r\n\r\n`,
-        );
+            `Content-Length: ${currentFrame.length}\r\n\r\n`;
 
-        res.write(frame);
-        res.write("\r\n");
+          const frameWritten = res.write(header);
+          if (!frameWritten) {
+            res.once("drain", () => {
+              if (res.destroyed) {
+                isWritingFrame = false;
+                return;
+              }
+              const readyFrame = pendingLatestFrame ?? currentFrame;
+              pendingLatestFrame = undefined;
+              if (readyFrame !== currentFrame) writeFrame(readyFrame);
+              else {
+                const frameResult = res.write(currentFrame);
+                if (frameResult) {
+                  res.write("\r\n", () => {
+                    isWritingFrame = false;
+                  });
+                } else {
+                  res.once("drain", () => {
+                    res.write("\r\n", () => {
+                      isWritingFrame = false;
+                    });
+                  });
+                }
+              }
+            });
+            return;
+          }
+
+          const frameWriteResult = res.write(currentFrame);
+          if (!frameWriteResult) {
+            res.once("drain", () => {
+              if (res.destroyed) return;
+              if (pendingLatestFrame) {
+                const newest = pendingLatestFrame;
+                pendingLatestFrame = undefined;
+                writeFrame(newest);
+                return;
+              }
+              res.write("\r\n", () => {
+                isWritingFrame = false;
+              });
+            });
+            return;
+          }
+
+          res.write("\r\n", () => {
+            isWritingFrame = false;
+            if (pendingLatestFrame) {
+              const newest = pendingLatestFrame;
+              pendingLatestFrame = undefined;
+              writeFrame(newest);
+            }
+          });
+        };
+
+        writeNext();
       };
 
-      const unsubscribe = deviceStreamService.subscribe(deviceId, writeFrame);
+      const unsubscribe = deviceStreamService.subscribeLive(
+        deviceId,
+        writeFrame,
+      );
 
-      const latestFrame = deviceStreamService.getLatestFrame(deviceId);
+      const latestFrame = deviceStreamService.getLatestLiveFrame(deviceId);
 
       console.log("[STREAM] initial frame:", {
         deviceId,

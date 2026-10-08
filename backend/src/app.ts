@@ -11,6 +11,7 @@ import { errorMiddleware } from "./middleware/error.middleware";
 import { deviceService } from "./services/device.service";
 import { alertService } from "./services/alert.service";
 import { broadcastAlert, broadcastBabyStatus } from "./socket/socket.handler";
+import { createLiveIngestServer } from "./live-ingest";
 
 const app = express();
 const httpServer = createServer(app);
@@ -52,6 +53,8 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`Smart Vision API listening on http://0.0.0.0:${PORT}`);
   console.log(`Environment: ${env.NODE_ENV}`);
 });
+
+createLiveIngestServer(httpServer);
 
 // Device online state is derived from the latest heartbeat.  This keeps the
 // dashboard truthful even when a device loses power or Wi-Fi unexpectedly.

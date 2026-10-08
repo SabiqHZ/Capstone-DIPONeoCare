@@ -104,6 +104,18 @@ export const deviceService = {
     return { device: data, deviceToken };
   },
 
+  async getDeviceById(deviceId: string): Promise<DeviceContext | null> {
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .select(
+        "id, mac_address, baby_id, unit_id, is_online, crying_min_duration_sec, notification_cooldown_sec",
+      )
+      .eq("id", deviceId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as DeviceContext | null;
+  },
+
   async getDeviceByMac(macAddress: string): Promise<DeviceContext | null> {
     const { data, error } = await supabaseAdmin
       .from("devices")

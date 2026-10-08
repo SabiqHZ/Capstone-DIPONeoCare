@@ -1,26 +1,27 @@
-type FrameListener = (frame: Buffer) => void;
+type LiveFrameListener = (frame: Buffer) => void;
 
-const latestFrames = new Map<string, Buffer>();
-const listeners = new Map<string, Set<FrameListener>>();
+const latestLiveFrames = new Map<string, Buffer>();
+const liveListeners = new Map<string, Set<LiveFrameListener>>();
 
 export const deviceStreamService = {
-  publishFrame(deviceId: string, frame: Buffer): void {
-    latestFrames.set(deviceId, frame);
-    for (const listener of listeners.get(deviceId) ?? []) listener(frame);
+  publishLiveFrame(deviceId: string, frame: Buffer): void {
+    latestLiveFrames.set(deviceId, frame);
+    for (const listener of liveListeners.get(deviceId) ?? []) listener(frame);
   },
 
-  getLatestFrame(deviceId: string): Buffer | undefined {
-    return latestFrames.get(deviceId);
+  getLatestLiveFrame(deviceId: string): Buffer | undefined {
+    return latestLiveFrames.get(deviceId);
   },
 
-  subscribe(deviceId: string, listener: FrameListener): () => void {
-    const deviceListeners = listeners.get(deviceId) ?? new Set<FrameListener>();
+  subscribeLive(deviceId: string, listener: LiveFrameListener): () => void {
+    const deviceListeners =
+      liveListeners.get(deviceId) ?? new Set<LiveFrameListener>();
     deviceListeners.add(listener);
-    listeners.set(deviceId, deviceListeners);
+    liveListeners.set(deviceId, deviceListeners);
 
     return () => {
       deviceListeners.delete(listener);
-      if (deviceListeners.size === 0) listeners.delete(deviceId);
+      if (deviceListeners.size === 0) liveListeners.delete(deviceId);
     };
   },
 };

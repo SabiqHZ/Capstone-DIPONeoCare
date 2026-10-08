@@ -22,6 +22,17 @@ const { width } = Dimensions.get("window");
 export default function CameraScreen() {
   const user = useAuthStore((s) => s.user);
   const { state } = useBabyContext();
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
+  const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
+
+  const babyId = user?.role === "parent" ? user.babyId : null;
+  const focusedStatus = babyId ? state.statuses[babyId] : null;
+  const isDeviceOnline =
+    focusedStatus?.deviceOnline ?? apiDeviceOnline ?? false;
   const getActivityDistribution = () => {
     if (!dailyReport) {
       return {
@@ -63,17 +74,6 @@ export default function CameraScreen() {
   };
 
   const activityDistribution = getActivityDistribution();
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
-  const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
-
-  const babyId = user?.role === "parent" ? user.babyId : null;
-  const focusedStatus = babyId ? state.statuses[babyId] : null;
-  const isDeviceOnline =
-    focusedStatus?.deviceOnline ?? apiDeviceOnline ?? false;
 
   useEffect(() => {
     if (babyId) void fetchStreamUrl();
@@ -105,17 +105,32 @@ export default function CameraScreen() {
   const fetchStreamUrl = async () => {
     setIsLoading(true);
     setHasError(false);
+
     try {
       const response = await api.get(`/babies/${babyId}`);
+
+      console.log("[ParentCamera] baby response:", response.data);
+
       const device = response.data.data?.devices;
+
+      console.log("[ParentCamera] device:", device);
+
+      const deviceId = device?.id;
+
+      console.log("[ParentCamera] deviceId:", deviceId);
+
+      const url = deviceId ? await deviceService.getStreamUrl(deviceId) : null;
+
+      console.log("[ParentCamera] streamUrl:", url);
+
       setApiDeviceOnline(
         typeof device?.is_online === "boolean" ? device.is_online : null,
       );
-      const deviceId = device?.id;
-      setStreamUrl(
-        deviceId ? await deviceService.getStreamUrl(deviceId) : null,
-      );
-    } catch {
+
+      setStreamUrl(url);
+    } catch (error) {
+      console.error("[ParentCamera] fetchStreamUrl ERROR:", error);
+
       setStreamUrl(null);
       setApiDeviceOnline(null);
       setHasError(true);
@@ -230,6 +245,7 @@ export default function CameraScreen() {
           </View>
         ) : (
           <WebView
+            originWhitelist={["*"]}
             source={{ html: streamHtml }}
             style={styles.webview}
             scrollEnabled={false}
@@ -237,18 +253,36 @@ export default function CameraScreen() {
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             mixedContentMode="always"
-            onError={() => setHasError(true)}
-            onHttpError={() => setHasError(true)}
+            onError={(syntheticEvent) => {
+              console.error(
+                "[ParentCamera] WebView error:",
+                syntheticEvent.nativeEvent,
+              );
+              setHasError(true);
+            }}
+            onHttpError={(syntheticEvent) => {
+              console.error(
+                "[ParentCamera] WebView HTTP error:",
+                syntheticEvent.nativeEvent,
+              );
+              setHasError(true);
+            }}
+            onLoadStart={() =>
+              console.log("[ParentCamera] WebView load start:", streamUrl)
+            }
+            onLoadEnd={() =>
+              console.log("[ParentCamera] WebView load end:", streamUrl)
+            }
             onMessage={(event) => {
+              console.log(
+                "[ParentCamera] WebView message:",
+                event.nativeEvent.data,
+              );
+
               if (event.nativeEvent.data === "stream-error") {
                 setHasError(true);
               }
             }}
-            renderLoading={() => (
-              <View style={styles.centerBox}>
-                <ActivityIndicator color="#1D9E75" />
-              </View>
-            )}
             startInLoadingState
           />
         )}
