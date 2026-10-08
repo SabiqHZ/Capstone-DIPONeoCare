@@ -148,8 +148,10 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
 
     socketInstance = io(CONFIG.SOCKET_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
+      upgrade: true,
       reconnection: true,
+      reconnectionAttempts: 5,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       timeout: 10000,

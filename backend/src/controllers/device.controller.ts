@@ -213,7 +213,60 @@ export const deviceController = {
       res.status(500).json({ success: false, error: err.message });
     }
   },
+  async streamFrame(req: Request, res: Response): Promise<void> {
+    const deviceId = req.params.id as string;
 
+    try {
+      const device = await deviceService.getDeviceStreamAccessById(deviceId);
+
+      if (!device) {
+        res.status(404).json({
+          success: false,
+          error: "Perangkat tidak ditemukan",
+        });
+        return;
+      }
+
+      if (!device.baby_id) {
+        res.status(409).json({
+          success: false,
+          error: "Perangkat belum dipair ke bayi",
+        });
+        return;
+      }
+
+      const frame = deviceStreamService.getLatestLiveFrame(deviceId);
+
+      if (!frame) {
+        res.status(404).json({
+          success: false,
+          error: "Frame kamera belum tersedia",
+        });
+        return;
+      }
+
+      res.status(200);
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Content-Length", frame.length.toString());
+      res.setHeader(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate",
+      );
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      res.end(frame);
+    } catch (err: any) {
+      console.error("[STREAM-FRAME] error:", err);
+
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    }
+  },
   async available(req: AuthRequest, res: Response): Promise<void> {
     try {
       if (!req.user?.unitId) {
@@ -383,6 +436,7 @@ export const deviceController = {
       }
     }
   },
+
   async getConfig(req: AuthRequest, res: Response): Promise<void> {
     try {
       const data = await deviceService.getDeviceConfigById(

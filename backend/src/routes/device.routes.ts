@@ -34,7 +34,7 @@ router.get(
 );
 
 router.get("/:id/stream", deviceController.stream);
-
+router.get("/:id/stream/frame", deviceController.streamFrame);
 router.get("/:id/live/ingest", (req, res) => {
   res.status(426).json({
     success: false,
