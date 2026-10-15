@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { WebView } from "react-native-webview";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
 import { Fonts } from "../../../constants/fonts";
@@ -55,6 +55,19 @@ export default function BabyDetailScreen() {
 
   const [baby, setBaby] = useState<BabyDetail | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [frameUrls, setFrameUrls] = useState<[string | null, string | null]>([
+    null,
+    null,
+  ]);
+  const [activeFrameIndex, setActiveFrameIndex] = useState<0 | 1>(0);
+  const [hasFrame, setHasFrame] = useState(false);
+  const [isLoadingStream, setIsLoadingStream] = useState(false);
+  const [hasStreamError, setHasStreamError] = useState(false);
+
+  const pendingFrameRef = useRef<{ index: 0 | 1; url: string } | null>(null);
+  const hasFrameRef = useRef(false);
+  const scheduleFrameRef = useRef<((index: 0 | 1) => void) | null>(null);
+  const streamRequestIdRef = useRef(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,25 +97,133 @@ export default function BabyDetailScreen() {
     if (id) setFocused(id);
   }, [id, setFocused, fetchBaby]);
 
-  useEffect(() => {
-    let isCurrent = true;
-    const deviceId = baby?.devices?.id;
-    setStreamUrl(null);
-    if (!deviceId) return;
+  const deviceId = baby?.devices?.id;
 
-    void deviceService
-      .getStreamUrl(deviceId)
-      .then((url) => {
-        if (isCurrent) setStreamUrl(url);
-      })
-      .catch(() => {
-        if (isCurrent) setStreamUrl(null);
+  const resetCameraFrames = useCallback(() => {
+    setFrameUrls([null, null]);
+    setActiveFrameIndex(0);
+    setHasFrame(false);
+    hasFrameRef.current = false;
+    pendingFrameRef.current = null;
+  }, []);
+
+  const fetchStreamUrl = useCallback(async () => {
+    const requestId = ++streamRequestIdRef.current;
+
+    setStreamUrl(null);
+    resetCameraFrames();
+    setHasStreamError(false);
+
+    if (!deviceId) {
+      setIsLoadingStream(false);
+      return;
+    }
+
+    setIsLoadingStream(true);
+    try {
+      const url = await deviceService.getStreamUrl(deviceId);
+      if (requestId === streamRequestIdRef.current) {
+        setStreamUrl(url);
+      }
+    } catch {
+      if (requestId === streamRequestIdRef.current) {
+        setStreamUrl(null);
+        setHasStreamError(true);
+      }
+    } finally {
+      if (requestId === streamRequestIdRef.current) {
+        setIsLoadingStream(false);
+      }
+    }
+  }, [deviceId, resetCameraFrames]);
+
+  useEffect(() => {
+    void fetchStreamUrl();
+    return () => {
+      // Ignore any late URL result after the selected baby/device changes.
+      streamRequestIdRef.current += 1;
+    };
+  }, [fetchStreamUrl]);
+
+  const handleFrameLoaded = (index: 0 | 1, url: string | null) => {
+    if (!url) return;
+
+    const pending = pendingFrameRef.current;
+    if (!pending || pending.index !== index || pending.url !== url) return;
+
+    pendingFrameRef.current = null;
+    hasFrameRef.current = true;
+    setActiveFrameIndex(index);
+    setHasFrame(true);
+    setHasStreamError(false);
+
+    const nextIndex: 0 | 1 = index === 0 ? 1 : 0;
+    scheduleFrameRef.current?.(nextIndex);
+  };
+
+  const handleFrameError = (index: 0 | 1, url: string | null) => {
+    if (!url) return;
+
+    const pending = pendingFrameRef.current;
+    if (!pending || pending.index !== index || pending.url !== url) return;
+
+    pendingFrameRef.current = null;
+    // Keep the last good frame visible if a later frame request fails.
+    if (!hasFrameRef.current) {
+      setHasStreamError(true);
+    }
+    // Keep retrying just like the Parents camera screen.
+    scheduleFrameRef.current?.(index);
+  };
+
+  useEffect(() => {
+    if (!streamUrl) {
+      resetCameraFrames();
+      return;
+    }
+
+    const normalizedStreamUrl = streamUrl.endsWith("/")
+      ? streamUrl.slice(0, -1)
+      : streamUrl;
+    const frameEndpoint = `${normalizedStreamUrl}/frame`;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const requestFrame = (index: 0 | 1) => {
+      if (cancelled) return;
+      const url = `${frameEndpoint}?t=${Date.now()}`;
+      pendingFrameRef.current = { index, url };
+      setFrameUrls((current) => {
+        const next: [string | null, string | null] = [current[0], current[1]];
+        next[index] = url;
+        return next;
       });
+    };
+
+    const scheduleNextFrame = (index: 0 | 1) => {
+      if (cancelled) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => requestFrame(index), 1000);
+    };
+
+    scheduleFrameRef.current = scheduleNextFrame;
+    setFrameUrls([null, null]);
+    setActiveFrameIndex(0);
+    setHasFrame(false);
+    hasFrameRef.current = false;
+    pendingFrameRef.current = null;
+    requestFrame(0);
 
     return () => {
-      isCurrent = false;
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      pendingFrameRef.current = null;
+      if (scheduleFrameRef.current === scheduleNextFrame) {
+        scheduleFrameRef.current = null;
+      }
     };
-  }, [baby?.devices?.id]);
+  }, [streamUrl, resetCameraFrames]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -214,7 +335,9 @@ export default function BabyDetailScreen() {
   const faceAnomaly =
     realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
 
-  const faceCovered = faceAnomaly != null && faceAnomaly !== "none";
+  // null berarti AI belum memberikan hasil; jangan menyamakannya dengan kondisi normal.
+  const faceStatusUnknown = faceAnomaly == null;
+  const faceCovered = !faceStatusUnknown && faceAnomaly !== "none";
 
   const activity =
     realtimeStatus?.activity ?? baby.baby_statuses?.activity ?? null;
@@ -226,14 +349,6 @@ export default function BabyDetailScreen() {
 
   const lastUpdated =
     realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at ?? null;
-
-  const htmlContent = `
-    <html>
-      <body style="margin:0;padding:0;background-color:#111827;display:flex;justify-content:center;align-items:center;">
-        <img src=${JSON.stringify(streamUrl ?? "")} style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'" />
-      </body>
-    </html>
-  `;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -349,120 +464,208 @@ export default function BabyDetailScreen() {
           </View>
         ) : (
           <>
-            {!isDeviceOnline || !streamUrl ? (
-              <View style={styles.waitingBox}>
-                <ActivityIndicator color={Colors.secondary} size="large" />
-                <Text style={styles.waitingText}>
-                  {!streamUrl
-                    ? "Menunggu perangkat kamera terdaftar..."
-                    : "Menunggu koneksi kamera..."}
-                </Text>
-                <Text style={styles.offlineText}>
-                  Terakhir online:{" "}
-                  {baby.devices?.last_heartbeat
-                    ? new Date(baby.devices.last_heartbeat).toLocaleString(
-                        "id-ID",
-                      )
-                    : "Belum pernah"}
+            {/* Stream memakai polling /frame + double buffering, sama dengan Parents. */}
+            <View style={styles.cameraContainer}>
+              {streamUrl ? (
+                <>
+                  {frameUrls[0] ? (
+                    <Image
+                      key={`caregiver-camera-0-${frameUrls[0]}`}
+                      source={{ uri: frameUrls[0] }}
+                      style={[
+                        styles.cameraImage,
+                        { opacity: hasFrame && activeFrameIndex === 0 ? 1 : 0 },
+                      ]}
+                      resizeMode="contain"
+                      fadeDuration={0}
+                      onLoad={() => handleFrameLoaded(0, frameUrls[0])}
+                      onError={() => handleFrameError(0, frameUrls[0])}
+                    />
+                  ) : null}
+
+                  {frameUrls[1] ? (
+                    <Image
+                      key={`caregiver-camera-1-${frameUrls[1]}`}
+                      source={{ uri: frameUrls[1] }}
+                      style={[
+                        styles.cameraImage,
+                        { opacity: hasFrame && activeFrameIndex === 1 ? 1 : 0 },
+                      ]}
+                      resizeMode="contain"
+                      fadeDuration={0}
+                      onLoad={() => handleFrameLoaded(1, frameUrls[1])}
+                      onError={() => handleFrameError(1, frameUrls[1])}
+                    />
+                  ) : null}
+
+                  {!hasFrame ? (
+                    <View style={styles.cameraMessageOverlay}>
+                      {hasStreamError ? (
+                        <>
+                          <Text style={styles.offlineText}>
+                            Belum menerima frame kamera
+                          </Text>
+                          <Text style={styles.offlineSub}>
+                            Mencoba kembali secara otomatis...
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <ActivityIndicator
+                            color={Colors.secondary}
+                            size="large"
+                          />
+                          <Text style={styles.waitingText}>
+                            Menunggu frame kamera...
+                          </Text>
+                        </>
+                      )}
+                      <Text style={styles.offlineText}>
+                        Terakhir online:{" "}
+                        {baby.devices?.last_heartbeat
+                          ? new Date(
+                              baby.devices.last_heartbeat,
+                            ).toLocaleString("id-ID")
+                          : "Belum pernah"}
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              ) : isLoadingStream ? (
+                <View style={styles.cameraMessageOverlay}>
+                  <ActivityIndicator color={Colors.secondary} size="large" />
+                  <Text style={styles.waitingText}>
+                    Menghubungkan ke kamera...
+                  </Text>
+                </View>
+              ) : hasStreamError ? (
+                <View style={styles.cameraMessageOverlay}>
+                  <Text style={styles.offlineText}>
+                    Gagal menyiapkan stream kamera
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.retryBtn}
+                    onPress={() => void fetchStreamUrl()}
+                  >
+                    <Text style={styles.retryText}>Coba Lagi</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.cameraMessageOverlay}>
+                  <Text style={styles.offlineText}>
+                    Stream kamera belum tersedia
+                  </Text>
+                  <Text style={styles.offlineSub}>
+                    Periksa pemasangan dan koneksi perangkat kamera.
+                  </Text>
+                </View>
+              )}
+
+              {hasFrame ? (
+                <View style={styles.liveBadge}>
+                  <Text style={styles.liveText}>🔴 LIVE</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Status AI Komprehensif */}
+            <View style={styles.aiStatusGrid}>
+              <View
+                style={[
+                  styles.aiCard,
+                  isCrying === true ? styles.cryActive : styles.normalCard,
+                ]}
+              >
+                <Icon
+                  name={
+                    isCrying === true
+                      ? "emoticon-cry-outline"
+                      : isCrying === false
+                        ? "emoticon-happy-outline"
+                        : "help-circle-outline"
+                  }
+                  library="material"
+                  size={24}
+                  color={isCrying === true ? Colors.danger : Colors.primary}
+                />
+                <Text style={styles.aiCardLabel}>Suara</Text>
+                <Text style={styles.aiCardValue}>
+                  {isCrying === null
+                    ? "Menunggu data AI"
+                    : isCrying
+                      ? `Menangis${
+                          cryingDurationSec != null
+                            ? ` (${cryingDurationSec}s)`
+                            : ""
+                        }`
+                      : "Tenang"}
                 </Text>
               </View>
-            ) : (
-              <>
-                {/* Kamera Live Stream (Asli dengan WebView) */}
-                <View style={styles.cameraContainer}>
-                  <WebView
-                    source={{ html: htmlContent }}
-                    style={styles.cameraStream}
-                    scrollEnabled={false}
-                    bounces={false}
-                    mixedContentMode="always"
-                    showsHorizontalScrollIndicator={false}
-                    showsVerticalScrollIndicator={false}
-                  />
-                  <View style={styles.liveBadge}>
-                    <Text style={styles.liveText}>🔴 LIVE</Text>
-                  </View>
-                </View>
 
-                {/* Status AI Komprehensif */}
-                <View style={styles.aiStatusGrid}>
-                  <View
-                    style={[
-                      styles.aiCard,
-                      isCrying === true ? styles.cryActive : styles.normalCard,
-                    ]}
-                  >
-                    <Icon
-                      name={
-                        isCrying === true
-                          ? "emoticon-cry-outline"
-                          : isCrying === false
-                            ? "emoticon-happy-outline"
-                            : "help-circle-outline"
-                      }
-                      library="material"
-                      size={24}
-                      color={isCrying === true ? Colors.danger : Colors.primary}
-                    />
-                    <Text style={styles.aiCardLabel}>Suara</Text>
-                    <Text style={styles.aiCardValue}>
-                      {isCrying === null
-                        ? "Menunggu data AI"
-                        : isCrying
-                          ? `Menangis${
-                              cryingDurationSec != null
-                                ? ` (${cryingDurationSec}s)`
-                                : ""
-                            }`
-                          : "Tenang"}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.aiCard,
-                      faceCovered ? styles.anomalyActive : styles.normalCard,
-                    ]}
-                  >
-                    <Icon
-                      name={faceCovered ? "eye-off-outline" : "eye-outline"}
-                      library="ionicons"
-                      size={24}
-                      color={faceCovered ? Colors.warning : Colors.primary}
-                    />
-                    <Text style={styles.aiCardLabel}>Wajah (YOLO)</Text>
-                    <Text style={styles.aiCardValue}>
-                      {faceCovered ? "Tertutup!" : "Terlihat"}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.aiCard, styles.normalCard]}>
-                    <Icon
-                      name="body-outline"
-                      library="ionicons"
-                      size={24}
-                      color={Colors.primary}
-                    />
-                    <Text style={styles.aiCardLabel}>Aktivitas</Text>
-                    <Text style={styles.aiCardValue}>
-                      {activity === null
-                        ? "Menunggu data AI"
-                        : activity === "sleeping"
-                          ? "Tidur"
-                          : activity === "awake"
-                            ? "Bangun"
-                            : "Menangis"}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.lastUpdated}>
-                  Diperbarui:{" "}
-                  {lastUpdated
-                    ? new Date(lastUpdated).toLocaleTimeString("id-ID")
-                    : "Menunggu data AI"}
+              <View
+                style={[
+                  styles.aiCard,
+                  faceCovered ? styles.anomalyActive : styles.normalCard,
+                ]}
+              >
+                <Icon
+                  name={
+                    faceStatusUnknown
+                      ? "help-circle-outline"
+                      : faceCovered
+                        ? "eye-off-outline"
+                        : "eye-outline"
+                  }
+                  library="ionicons"
+                  size={24}
+                  color={
+                    faceStatusUnknown
+                      ? Colors.textMuted
+                      : faceCovered
+                        ? Colors.warning
+                        : Colors.primary
+                  }
+                />
+                <Text style={styles.aiCardLabel}>Wajah (YOLO)</Text>
+                <Text
+                  style={[
+                    styles.aiCardValue,
+                    faceStatusUnknown && { color: Colors.textMuted },
+                  ]}
+                >
+                  {faceStatusUnknown
+                    ? "Menunggu data AI"
+                    : faceCovered
+                      ? "Tertutup!"
+                      : "Terlihat"}
                 </Text>
-              </>
-            )}
+              </View>
+
+              <View style={[styles.aiCard, styles.normalCard]}>
+                <Icon
+                  name="body-outline"
+                  library="ionicons"
+                  size={24}
+                  color={Colors.primary}
+                />
+                <Text style={styles.aiCardLabel}>Aktivitas</Text>
+                <Text style={styles.aiCardValue}>
+                  {activity === null
+                    ? "Menunggu data AI"
+                    : activity === "sleeping"
+                      ? "Tidur"
+                      : activity === "awake"
+                        ? "Bangun"
+                        : "Menangis"}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.lastUpdated}>
+              Diperbarui:{" "}
+              {lastUpdated
+                ? new Date(lastUpdated).toLocaleTimeString("id-ID")
+                : "Menunggu data AI"}
+            </Text>
 
             <View style={styles.deviceCard}>
               <View style={styles.deviceCardHeader}>
@@ -721,6 +924,14 @@ const styles = StyleSheet.create({
     color: Colors.textDisabled,
     textAlign: "center",
   },
+  offlineSub: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+    lineHeight: 18,
+    paddingHorizontal: 16,
+  },
   cameraContainer: {
     width: "100%",
     height: 220,
@@ -730,7 +941,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
   },
-  cameraStream: { flex: 1, backgroundColor: "transparent" },
+  cameraImage: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#111827",
+  },
+  cameraMessageOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    padding: 20,
+    backgroundColor: "#111827",
+  },
   liveBadge: {
     position: "absolute",
     top: 12,

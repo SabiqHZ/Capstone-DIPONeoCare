@@ -93,6 +93,21 @@ export default function ParentDashboard() {
   );
   const visibleAlerts = alerts.slice(0, 3);
 
+  // null/undefined berarti status perangkat belum diketahui,
+  // bukan bukti bahwa perangkat sedang offline.
+  const deviceOnline = status?.deviceOnline ?? null;
+  const isDeviceStatusUnknown = deviceOnline === null;
+  const deviceBadgeBackground = isDeviceStatusUnknown
+    ? "#F3F4F6"
+    : deviceOnline
+      ? "#052e16"
+      : "#1f0a0a";
+  const deviceStatusColor = isDeviceStatusUnknown
+    ? "#6B7280"
+    : deviceOnline
+      ? "#4ade80"
+      : "#f87171";
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -111,28 +126,21 @@ export default function ParentDashboard() {
             <View
               style={[
                 styles.badge,
-                {
-                  backgroundColor: status?.deviceOnline ? "#052e16" : "#1f0a0a",
-                },
+                { backgroundColor: deviceBadgeBackground },
               ]}
             >
               <View
                 style={[
                   styles.badgeDot,
-                  {
-                    backgroundColor: status?.deviceOnline
-                      ? "#4ade80"
-                      : "#f87171",
-                  },
+                  { backgroundColor: deviceStatusColor },
                 ]}
               />
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: status?.deviceOnline ? "#4ade80" : "#f87171" },
-                ]}
-              >
-                {status?.deviceOnline ? "Online" : "Offline"}
+              <Text style={[styles.badgeText, { color: deviceStatusColor }]}>
+                {isDeviceStatusUnknown
+                  ? "Belum diketahui"
+                  : deviceOnline
+                    ? "Online"
+                    : "Offline"}
               </Text>
             </View>
 

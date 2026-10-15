@@ -250,7 +250,7 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
         alertLevel: statusData?.alert_level ?? null,
 
         // status hardware tetap boleh berasal dari device
-        deviceOnline: deviceData?.is_online ?? false,
+        deviceOnline: deviceData?.is_online ?? null,
 
         // Jangan membuat timestamp palsu
         lastUpdated: statusData?.updated_at ?? null,
