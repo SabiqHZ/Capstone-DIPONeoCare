@@ -13,6 +13,9 @@ import Svg, { Path } from "react-native-svg";
 import { useAuthStore } from "../../stores/auth.store";
 import { reportService } from "../../services/report.service";
 import { DailyReport, ReportHistoryItem } from "../../types";
+import { Colors } from "../../constants/colors";
+import { Typography } from "../../constants/fonts";
+import { Radii, Spacing } from "../../constants/ui";
 
 export default function ReportScreen() {
   const babyId = useAuthStore((s) =>
@@ -160,7 +163,13 @@ export default function ReportScreen() {
         <Text style={styles.title}>Laporan Harian</Text>
 
         <View style={styles.datePicker}>
-          <TouchableOpacity onPress={() => goDay(-1)} style={styles.dateBtn}>
+          <TouchableOpacity
+            onPress={() => goDay(-1)}
+            style={styles.dateBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Lihat hari sebelumnya"
+            accessibilityHint="Menampilkan laporan untuk satu hari sebelumnya"
+          >
             <Svg
               width="24"
               height="24"
@@ -188,6 +197,9 @@ export default function ReportScreen() {
             onPress={() => goDay(1)}
             style={styles.dateBtn}
             disabled={isToday}
+            accessibilityRole="button"
+            accessibilityLabel="Lihat hari berikutnya"
+            accessibilityHint="Menampilkan laporan untuk satu hari berikutnya"
           >
             <Svg
               width="24"
@@ -233,7 +245,7 @@ export default function ReportScreen() {
         ) : !report ? (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>
-              Belum ada data rekam AI untuk tanggal ini.
+              Belum ada catatan pemantauan untuk tanggal ini.
             </Text>
           </View>
         ) : (
@@ -382,7 +394,7 @@ export default function ReportScreen() {
                         styles.macroSeg,
                         {
                           flex: dailyMacro.sleepPct,
-                          backgroundColor: "#1D9E75",
+                          backgroundColor: Colors.success,
                         },
                       ]}
                     />
@@ -393,7 +405,7 @@ export default function ReportScreen() {
                         styles.macroSeg,
                         {
                           flex: dailyMacro.awakePct,
-                          backgroundColor: "#EF9F27",
+                          backgroundColor: Colors.info,
                         },
                       ]}
                     />
@@ -404,7 +416,7 @@ export default function ReportScreen() {
                         styles.macroSeg,
                         {
                           flex: dailyMacro.cryingPct,
-                          backgroundColor: "#E24B4A",
+                          backgroundColor: Colors.critical,
                         },
                       ]}
                     />
@@ -414,17 +426,17 @@ export default function ReportScreen() {
                 <View style={styles.macroLegend}>
                   <LegendItem
                     label="Tidur"
-                    color="#1D9E75"
+                    color={Colors.success}
                     pct={dailyMacro.sleepPct}
                   />
                   <LegendItem
                     label="Bangun"
-                    color="#EF9F27"
+                    color={Colors.info}
                     pct={dailyMacro.awakePct}
                   />
                   <LegendItem
                     label="Menangis"
-                    color="#E24B4A"
+                    color={Colors.critical}
                     pct={dailyMacro.cryingPct}
                   />
                 </View>
@@ -466,7 +478,7 @@ export default function ReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: hour.sleepMinutes,
-                                  backgroundColor: "#1D9E75",
+                                  backgroundColor: Colors.success,
                                 },
                               ]}
                             />
@@ -477,7 +489,7 @@ export default function ReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: hour.awakeMinutes,
-                                  backgroundColor: "#EF9F27",
+                                  backgroundColor: Colors.info,
                                 },
                               ]}
                             />
@@ -488,7 +500,7 @@ export default function ReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: hour.cryingMinutes,
-                                  backgroundColor: "#E24B4A",
+                                  backgroundColor: Colors.critical,
                                 },
                               ]}
                             />
@@ -541,17 +553,17 @@ function LegendItem({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F0F9F5" },
-  content: { padding: 20, gap: 16, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: "700", color: "#085041" },
+  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 40 },
+  title: { ...Typography.h1, color: "#085041" },
   datePicker: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: Radii.control,
+    padding: Spacing.sm,
   },
 
-  dateBtn: { padding: 8 },
+  dateBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   dateCenter: { flex: 1, alignItems: "center" },
   dateText: { fontSize: 13, fontWeight: "600", color: "#374151" },
   centerBox: { alignItems: "center", paddingVertical: 80 },
@@ -574,8 +586,8 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: "48%",
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     elevation: 1,
   },
   summaryValue: {
@@ -583,14 +595,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#374151",
   },
-  sleepValue: { color: "#0F6E56" },
-  awakeValue: { color: "#B7791F" },
-  cryingValue: { color: "#C53030" },
+  sleepValue: { color: Colors.successDark },
+  awakeValue: { color: Colors.info },
+  cryingValue: { color: Colors.criticalDark },
   summaryLabel: { marginTop: 4, fontSize: 12, color: "#6B7280" },
   historyCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 12,
     elevation: 1,
   },
@@ -653,12 +665,12 @@ const styles = StyleSheet.create({
   historyError: { fontSize: 12, color: "#B42318" },
   chartCard: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 16,
     elevation: 1,
   },
-  chartTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
+  chartTitle: { ...Typography.bodyStrong, color: "#111827" },
   stackedBarContainer: { gap: 12 },
   macroTrack: {
     height: 32,

@@ -11,11 +11,16 @@ import {
   Alert,
   Modal,
   FlatList,
+  Platform,
 } from "react-native";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
-import { Fonts } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
+import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { babyService } from "../../services/baby.service";
 import api from "../../services/api"; // Pastikan path ini benar sesuai strukturmu
 import { RegisteredBaby } from "../../types";
@@ -33,7 +38,52 @@ interface Device {
   mac_address: string;
   name: string;
 }
+const formatDateInput = (date: Date): string => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
 
+  return `${day}/${month}/${date.getFullYear()}`;
+};
+
+const parseDateInput = (value: string): Date | null => {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+
+  const [, day, month, year] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+};
+
+const isValidJakartaDate = (value: string): boolean => {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (!match) return false;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  if (year < 1900 || year > new Date().getFullYear()) {
+    return false;
+  }
+
+  if (month < 1 || month > 12 || day < 1) {
+    return false;
+  }
+
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+};
+
+const dateInputToApiDate = (value: string): string => {
+  const [day, month, year] = value.split("/");
+
+  return `${year}-${month}-${day}`;
+};
 export default function RegisterBabyScreen() {
   const router = useRouter();
   const [form, setForm] = useState<BabyForm>({
@@ -48,6 +98,8 @@ export default function RegisterBabyScreen() {
   const [registeredBaby, setRegisteredBaby] = useState<RegisteredBaby | null>(
     null,
   );
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
 
   // State untuk Dropdown Kamera
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
@@ -68,7 +120,7 @@ export default function RegisterBabyScreen() {
       }
     } catch (error) {
       console.error("Gagal mengambil daftar kamera:", error);
-      Alert.alert("Error", "Gagal memuat daftar kamera yang tersedia.");
+      Alert.alert("Gagal", "Tidak dapat memuat daftar kamera.");
     } finally {
       setIsLoadingDevices(false);
     }
@@ -76,6 +128,31 @@ export default function RegisterBabyScreen() {
 
   const update = (key: keyof BabyForm, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
+
+  const openDatePicker = () => {
+    const initialDate = parseDateInput(form.dateOfBirth) ?? new Date();
+    const maximumDate = new Date();
+    setPickerDate(initialDate);
+
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: initialDate,
+        mode: "date",
+        display: "calendar",
+        minimumDate: new Date(1900, 0, 1),
+        maximumDate,
+        firstDayOfWeek: 1,
+        onChange: (event, selectedDate) => {
+          if (event.type === "set" && selectedDate) {
+            update("dateOfBirth", formatDateInput(selectedDate));
+          }
+        },
+      });
+      return;
+    }
+
+    setIsDatePickerVisible(true);
+  };
 
   const isValid =
     form.name.trim() !== "" &&
@@ -86,43 +163,40 @@ export default function RegisterBabyScreen() {
 
   const handleSubmit = async () => {
     if (!isValid) {
-      Alert.alert("Lengkapi Data", "Semua field termasuk kamera wajib diisi.");
+      Alert.alert("Lengkapi Data", "Semua data termasuk pilihan kamera wajib diisi.");
       return;
     }
 
-    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!dateRegex.test(form.dateOfBirth)) {
+    if (!isValidJakartaDate(form.dateOfBirth)) {
       Alert.alert(
-        "Format Salah",
-        "Tanggal lahir harus dalam format DD/MM/YYYY",
+        "Tanggal Tidak Valid",
+        "Masukkan tanggal lahir yang valid dengan format DD/MM/YYYY.",
       );
       return;
     }
 
     setIsLoading(true);
+
     try {
-      const [day, month, year] = form.dateOfBirth.split("/");
-      const isoDate = `${year}-${month}-${day}`;
+      const apiDate = dateInputToApiDate(form.dateOfBirth);
 
       // 1. Daftarkan Bayi
       const baby = await babyService.registerBaby({
         name: form.name.trim(),
         bedNumber: form.bedNumber.trim(),
-        dateOfBirth: isoDate,
+        dateOfBirth: apiDate,
         parentName: form.parentName.trim(),
       });
 
-      // 2. Pair Perangkat secara otomatis (Tidak perlu Scan QR lagi)
+      // 2. Pair Perangkat secara otomatis
       await babyService.pairDevice(baby.id, form.deviceId);
 
       // Tandai sukses
       setRegisteredBaby(baby);
-    } catch (err: any) {
+    } catch {
       Alert.alert(
-        "Gagal Mendaftarkan",
-        err.response?.data?.message ||
-          err.message ||
-          "Terjadi kesalahan, coba lagi.",
+        "Gagal mendaftarkan bayi",
+        "Periksa kembali data dan koneksi Anda, lalu coba lagi.",
       );
     } finally {
       setIsLoading(false);
@@ -218,7 +292,7 @@ export default function RegisterBabyScreen() {
             style={styles.backToDashBtn}
             onPress={() => router.replace("/(caregiver)/dashboard")}
           >
-            <Text style={styles.backToDashText}>Kembali ke Dashboard</Text>
+            <Text style={styles.backToDashText}>Kembali ke Beranda</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -281,29 +355,31 @@ export default function RegisterBabyScreen() {
             iconLibrary="ionicons"
           />
           <View style={styles.divider} />
-          <Field
-            label="Tanggal Lahir"
-            placeholder="DD/MM/YYYY"
-            value={form.dateOfBirth}
-            onChangeText={(v) => {
-              let val = v.replace(/\D/g, "");
-              if (val.length >= 3 && val.length <= 4) {
-                val = val.slice(0, 2) + "/" + val.slice(2);
-              } else if (val.length > 4) {
-                val =
-                  val.slice(0, 2) +
-                  "/" +
-                  val.slice(2, 4) +
-                  "/" +
-                  val.slice(4, 8);
-              }
-              update("dateOfBirth", val);
-            }}
-            icon="calendar-outline"
-            iconLibrary="ionicons"
-            keyboardType="numeric"
-            maxLength={10}
-          />
+          <View style={fieldStyles.wrapper}>
+            <Text style={fieldStyles.label}>Tanggal Lahir</Text>
+            <TouchableOpacity
+              style={fieldStyles.inputRow}
+              onPress={openDatePicker}
+              accessibilityRole="button"
+              accessibilityLabel="Pilih tanggal lahir dari kalender"
+              accessibilityHint="Membuka pemilih tanggal lahir"
+            >
+              <Icon
+                name="calendar-outline"
+                library="ionicons"
+                size={18}
+                color={Colors.textMuted}
+              />
+              <Text
+                style={[
+                  fieldStyles.input,
+                  !form.dateOfBirth && fieldStyles.datePlaceholder,
+                ]}
+              >
+                {form.dateOfBirth || "Pilih tanggal lahir"}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.divider} />
           <Field
             label="Nama Orang Tua"
@@ -373,7 +449,7 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.white}
               />
-              <Text style={styles.submitBtnText}>Simpan & Pair Kamera</Text>
+              <Text style={styles.submitBtnText}>Simpan & Hubungkan Kamera</Text>
             </>
           )}
         </TouchableOpacity>
@@ -430,6 +506,50 @@ export default function RegisterBabyScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      {Platform.OS === "ios" ? (
+        <Modal
+          visible={isDatePickerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsDatePickerVisible(false)}
+        >
+          <View style={styles.datePickerOverlay}>
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity
+                  onPress={() => setIsDatePickerVisible(false)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.datePickerAction}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    update("dateOfBirth", formatDateInput(pickerDate));
+                    setIsDatePickerVisible(false);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.datePickerAction}>Pilih</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="inline"
+                locale="id-ID"
+                themeVariant="light"
+                minimumDate={new Date(1900, 0, 1)}
+                maximumDate={new Date()}
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setPickerDate(selectedDate);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -523,6 +643,7 @@ const fieldStyles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textPrimary,
   },
+  datePlaceholder: { color: Colors.textDisabled },
 });
 
 const styles = StyleSheet.create({
@@ -539,18 +660,17 @@ const styles = StyleSheet.create({
   },
   headerBack: { padding: 4 },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
+    ...Typography.h2,
     color: Colors.secondaryDark,
   },
-  content: { padding: 20, gap: 16, paddingBottom: 40 },
+  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 40 },
   infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
     backgroundColor: Colors.secondaryLight,
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: Radii.control,
+    padding: Spacing.md,
   },
   infoText: {
     flex: 1,
@@ -561,8 +681,8 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -577,8 +697,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     backgroundColor: Colors.secondary,
-    borderRadius: 12,
-    paddingVertical: 15,
+    borderRadius: Radii.control,
+    minHeight: ControlSize.minTouchTarget,
   },
   submitBtnDisabled: { backgroundColor: "#B5D4F4" },
   submitBtnText: {
@@ -594,8 +714,7 @@ const styles = StyleSheet.create({
   },
   successIconWrapper: { marginTop: 16, marginBottom: 8 },
   successTitle: {
-    fontFamily: Fonts.nunitoExtraBold,
-    fontSize: 24,
+    ...Typography.h1,
     color: Colors.primaryDark,
     textAlign: "center",
   },
@@ -682,6 +801,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
+  },
+  datePickerOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  datePickerModal: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 24,
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  datePickerAction: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 16,
+    color: Colors.secondary,
   },
   modalContent: {
     backgroundColor: Colors.white,

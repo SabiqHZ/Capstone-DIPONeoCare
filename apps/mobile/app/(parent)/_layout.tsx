@@ -68,7 +68,7 @@ export default function ParentLayout() {
         name="dashboard"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon IconComponent={HomeIcon} label="Dashboard" focused={focused} />
+            <TabIcon IconComponent={HomeIcon} label="Beranda" focused={focused} />
           ),
         }}
       />

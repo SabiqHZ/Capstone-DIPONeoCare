@@ -13,7 +13,8 @@ import {
 import { useRouter } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
-import { Fonts } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
+import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 // Kita menggunakan Fetch API bawaan agar tidak terikat aturan Axios (seperti interceptor token)
 // Karena saat konek ke ESP32, kita sedang offline dari internet dan tidak butuh JWT.
@@ -31,7 +32,7 @@ export default function DeviceSetupScreen() {
     if (!ssid.trim()) {
       Alert.alert(
         "Data Tidak Lengkap",
-        "Nama WiFi (SSID) Daycare wajib diisi.",
+        "Nama jaringan Wi-Fi daycare wajib diisi.",
       );
       return;
     }
@@ -54,7 +55,7 @@ export default function DeviceSetupScreen() {
       if (response.ok) {
         Alert.alert(
           "Berhasil Dikirim!",
-          "Kamera sekarang akan merestart dan mencoba terhubung ke WiFi Daycare. Silakan hubungkan kembali HP Anda ke WiFi Daycare.",
+          "Kamera akan mulai ulang dan mencoba terhubung ke Wi-Fi daycare. Hubungkan kembali ponsel Anda ke Wi-Fi daycare.",
           [
             {
               text: "Selesai",
@@ -68,7 +69,7 @@ export default function DeviceSetupScreen() {
     } catch (error) {
       Alert.alert(
         "Koneksi Gagal",
-        "Tidak bisa menghubungi kamera. Pastikan HP Anda SUDAH TERHUBUNG ke WiFi yang dipancarkan oleh kamera (misal: DIPONeoCare-Setup).",
+        "Tidak bisa menghubungi kamera. Pastikan ponsel Anda sudah terhubung ke jaringan Wi-Fi kamera (misalnya: DIPONeoCare-Setup).",
       );
     } finally {
       setIsLoading(false);
@@ -79,7 +80,13 @@ export default function DeviceSetupScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+          accessibilityHint="Kembali ke halaman sebelumnya"
+        >
           <Icon
             name="arrow-back"
             library="ionicons"
@@ -109,10 +116,10 @@ export default function DeviceSetupScreen() {
             berkedip.
           </Text>
           <Text style={styles.instructionText}>
-            2. Buka Pengaturan WiFi di HP Anda.
+            2. Buka Pengaturan Wi-Fi di ponsel Anda.
           </Text>
           <Text style={styles.instructionText}>
-            3. Cari dan hubungkan ke WiFi bernama{" "}
+            3. Cari dan hubungkan ke jaringan Wi-Fi bernama{" "}
             <Text style={styles.bold}>"SmartVision_Setup"</Text>.
           </Text>
           <Text style={styles.instructionText}>
@@ -139,16 +146,16 @@ export default function DeviceSetupScreen() {
               <View style={styles.stepCircle}>
                 <Text style={styles.stepCircleText}>2</Text>
               </View>
-              <Text style={styles.stepTitle}>Masukkan WiFi Daycare</Text>
+              <Text style={styles.stepTitle}>Masukkan Wi-Fi Daycare</Text>
             </View>
 
             <Text style={styles.instructionText}>
-              Masukkan nama WiFi (SSID) dan password klinik/daycare Anda agar
+              Masukkan nama jaringan Wi-Fi dan kata sandi klinik/daycare agar
               kamera bisa terhubung ke internet.
             </Text>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Nama WiFi (SSID)</Text>
+              <Text style={styles.label}>Nama jaringan Wi-Fi</Text>
               <View style={styles.inputBox}>
                 <Icon
                   name="wifi"
@@ -167,7 +174,7 @@ export default function DeviceSetupScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Password WiFi</Text>
+              <Text style={styles.label}>Kata sandi Wi-Fi</Text>
               <View style={styles.inputBox}>
                 <Icon
                   name="lock-closed-outline"
@@ -177,7 +184,7 @@ export default function DeviceSetupScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Kosongkan jika WiFi tidak dikunci"
+                  placeholder="Kosongkan jika Wi-Fi tidak dikunci"
                   value={password}
                   onChangeText={setPassword}
                   autoCapitalize="none"
@@ -234,17 +241,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { padding: 4 },
+  backBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
+    ...Typography.h2,
     color: Colors.secondaryDark,
   },
-  content: { padding: 20, gap: 16 },
+  content: { padding: Spacing.xl, gap: Spacing.lg },
   stepCard: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -297,8 +303,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.secondary,
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: Radii.control,
+    minHeight: ControlSize.minTouchTarget,
     marginTop: 16,
   },
   nextBtnText: {
@@ -339,8 +345,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: Radii.control,
+    minHeight: ControlSize.minTouchTarget,
     marginTop: 24,
   },
   submitBtnDisabled: {

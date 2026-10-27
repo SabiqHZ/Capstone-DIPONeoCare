@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { OtpInput } from '../../components/ui/OtpInput';
 import { useAuthStore } from '../../stores/auth.store';
 import { authService } from '../../services/auth.service';
+import { Typography } from '../../constants/fonts';
 
 export default function CodeEntryScreen() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function CodeEntryScreen() {
               />
             </View>
             <Text style={styles.appName}>Smart Vision</Text>
-            <Text style={styles.appSub}>Monitoring Bayi Real-time</Text>
+            <Text style={styles.appSub}>Pantau Bayi Secara Langsung</Text>
           </View>
 
           <View style={styles.card}>
@@ -91,7 +92,7 @@ export default function CodeEntryScreen() {
             style={styles.nurseLink}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={styles.nurseLinkText}>Pengasuh? Login di sini</Text>
+            <Text style={styles.nurseLinkText}>Pengasuh? Masuk di sini</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -111,15 +112,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logoImage: { width: 80, height: 80 },
-  appName: { fontSize: 28, fontWeight: '700', color: '#085041', letterSpacing: -0.5 },
-  appSub: { fontSize: 14, color: '#0F6E56' },
+  appName: { ...Typography.display, color: '#085041', letterSpacing: -0.5 },
+  appSub: { ...Typography.body, color: '#0F6E56' },
   card: {
     backgroundColor: '#fff', borderRadius: 20, padding: 28, gap: 18,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  cardDesc: { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
+  cardTitle: { ...Typography.h3, color: '#111827', textAlign: 'center' },
+  cardDesc: { ...Typography.body, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
   errorText: { fontSize: 12, color: '#E24B4A', textAlign: 'center' },
   btn: { backgroundColor: '#1D9E75', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   btnDisabled: { backgroundColor: '#9FE1CB' },

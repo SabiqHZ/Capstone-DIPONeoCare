@@ -1,11 +1,14 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/fonts';
+import { Radii, Spacing } from '../../constants/ui';
 
 export function StatusBadge({ online }: { online: boolean }) {
   return (
     <View style={[styles.badge, online ? styles.online : styles.offline]}>
       <View style={[styles.dot, online ? styles.dotOnline : styles.dotOffline]} />
       <Text style={[styles.text, online ? styles.textOnline : styles.textOffline]}>
-        {online ? 'Online' : 'Offline'}
+        {online ? 'Aktif' : 'Tidak aktif'}
       </Text>
     </View>
   );
@@ -16,16 +19,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radii.pill,
   },
-  online: { backgroundColor: '#E1F5EE' },
-  offline: { backgroundColor: '#F3F4F6' },
+  online: { backgroundColor: Colors.successLight },
+  offline: { backgroundColor: Colors.offlineLight },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  dotOnline: { backgroundColor: '#1D9E75' },
-  dotOffline: { backgroundColor: '#9CA3AF' },
-  text: { fontSize: 12, fontWeight: '600' },
-  textOnline: { color: '#085041' },
-  textOffline: { color: '#6B7280' },
+  dotOnline: { backgroundColor: Colors.success },
+  dotOffline: { backgroundColor: Colors.offline },
+  text: Typography.captionStrong,
+  textOnline: { color: Colors.successDark },
+  textOffline: { color: Colors.offlineDark },
 });

@@ -14,10 +14,10 @@ function getAuthErrorMessage(error: unknown, fallback: string): string {
   if (!axios.isAxiosError(error)) return fallback;
 
   if (!error.response) {
-    return 'Tidak dapat menghubungi server. Pastikan backend aktif dan ponsel berada di Wi-Fi yang sama.';
+    return 'Tidak dapat terhubung. Periksa koneksi Wi-Fi ponsel Anda, lalu coba lagi.';
   }
 
-  return error.response.data?.error || fallback;
+      return fallback;
 }
 
 export const authService = {
@@ -47,7 +47,9 @@ export const authService = {
         role: 'caregiver',
       };
     } catch (error: unknown) {
-      throw new Error(getAuthErrorMessage(error, 'Username atau password salah'));
+      throw new Error(
+        getAuthErrorMessage(error, 'Nama pengguna atau kata sandi salah.'),
+      );
     }
   },
 };

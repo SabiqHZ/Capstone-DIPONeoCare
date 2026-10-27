@@ -11,7 +11,7 @@ export function MuteToggle() {
     if (!isMuted) {
       Alert.alert(
         'Bisukan Notifikasi',
-        'Notifikasi peringatan akan dibisukan. Anda tetap bisa melihat alert di dashboard.',
+        'Notifikasi peringatan akan dibisukan. Anda tetap bisa melihat peringatan di beranda.',
         [
           { text: 'Batal', style: 'cancel' },
           {
@@ -31,12 +31,15 @@ export function MuteToggle() {
       style={styles.btn}
       onPress={handleToggle}
       activeOpacity={0.6}
+      accessibilityRole="button"
+      accessibilityLabel={isMuted ? "Aktifkan notifikasi" : "Bisukan notifikasi"}
+      accessibilityHint={isMuted ? "Mengaktifkan kembali suara peringatan" : "Membisukan suara peringatan"}
     >
       <Icon
         name={isMuted ? 'notifications-off-outline' : 'notifications-outline'}
         library="ionicons"
         size={26}
-        color={isMuted ? Colors.danger : Colors.secondaryDark}
+        color={isMuted ? Colors.warning : Colors.info}
       />
     </TouchableOpacity>
   );
@@ -44,7 +47,8 @@ export function MuteToggle() {
 
 const styles = StyleSheet.create({
   btn: {
-    padding: 2,
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -19,6 +19,9 @@ import { api } from "../../services/api";
 import { deviceService } from "../../services/device.service";
 import { reportService } from "../../services/report.service";
 import { DailyReport } from "../../types";
+import { Colors } from "../../constants/colors";
+import { Typography } from "../../constants/fonts";
+import { Radii, Spacing } from "../../constants/ui";
 import React from "react";
 
 const { width } = Dimensions.get("window");
@@ -396,14 +399,14 @@ export default function CameraScreen() {
     <SafeAreaView style={styles.safe}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>Live Kamera</Text>
+        <Text style={styles.title}>Kamera Langsung</Text>
 
         <View style={styles.badges}>
           <View
             style={[
               styles.onlineBadge,
               {
-                backgroundColor: isDeviceOnline ? "#052e16" : "#1f0a0a",
+                backgroundColor: isDeviceOnline ? Colors.successLight : Colors.offlineLight,
               },
             ]}
           >
@@ -411,7 +414,7 @@ export default function CameraScreen() {
               style={[
                 styles.onlineDot,
                 {
-                  backgroundColor: isDeviceOnline ? "#4ade80" : "#f87171",
+                  backgroundColor: isDeviceOnline ? Colors.success : Colors.offline,
                 },
               ]}
             />
@@ -420,11 +423,11 @@ export default function CameraScreen() {
               style={[
                 styles.onlineText,
                 {
-                  color: isDeviceOnline ? "#4ade80" : "#f87171",
+                  color: isDeviceOnline ? Colors.successDark : Colors.offlineDark,
                 },
               ]}
             >
-              {isDeviceOnline ? "Live" : "Offline"}
+              {isDeviceOnline ? "Aktif" : "Tidak aktif"}
             </Text>
           </View>
         </View>
@@ -483,7 +486,7 @@ export default function CameraScreen() {
                 {hasError ? (
                   <>
                     <Text style={styles.offlineText}>
-                      Belum menerima frame kamera
+                      Belum menerima gambar kamera
                     </Text>
 
                     <Text style={styles.offlineSub}>
@@ -495,7 +498,7 @@ export default function CameraScreen() {
                     <ActivityIndicator color="#1D9E75" />
 
                     <Text style={styles.centerText}>
-                      Menunggu frame kamera...
+                      Memuat gambar kamera...
                     </Text>
                   </>
                 )}
@@ -524,7 +527,7 @@ export default function CameraScreen() {
             <Text style={styles.offlineText}>Kamera belum dikonfigurasi</Text>
 
             <Text style={styles.offlineSub}>
-              Hubungi tenaga medis untuk scan QR perangkat
+              Hubungi tenaga medis untuk memindai kode QR kamera.
             </Text>
           </View>
         )}
@@ -533,6 +536,9 @@ export default function CameraScreen() {
         <TouchableOpacity
           style={styles.fullscreenBtn}
           onPress={() => setIsFullscreen((current) => !current)}
+          accessibilityRole="button"
+          accessibilityLabel={isFullscreen ? "Keluar dari layar penuh" : "Buka kamera layar penuh"}
+          accessibilityHint={isFullscreen ? "Kembali ke tampilan kamera dan informasi" : "Membuka tampilan kamera memenuhi layar"}
         >
           <Text style={styles.fullscreenIcon}>{isFullscreen ? "⊠" : "⊡"}</Text>
         </TouchableOpacity>
@@ -557,15 +563,15 @@ export default function CameraScreen() {
                   color: !isDeviceOnline
                     ? "#fff"
                     : hasAnomaly
-                      ? "#E24B4A"
-                      : "#1D9E75",
+                      ? Colors.warning
+                      : Colors.success,
                 },
               ]}
             >
               {!isDeviceOnline || !focusedStatus
                 ? "—"
                 : anomalyType === null
-                  ? "Menunggu data AI"
+                  ? "Menunggu hasil pemantauan"
                   : hasAnomaly
                     ? anomalyType
                     : "Terdeteksi"}
@@ -581,7 +587,7 @@ export default function CameraScreen() {
               style={[
                 styles.progressLabel,
                 {
-                  color: "#4ade80",
+                  color: Colors.success,
                 },
               ]}
             >
@@ -595,7 +601,7 @@ export default function CameraScreen() {
                   styles.progressBar,
                   {
                     width: `${activityDistribution.sleepPct}%`,
-                    backgroundColor: "#1D9E75",
+                    backgroundColor: Colors.success,
                   },
                 ]}
               />
@@ -608,7 +614,7 @@ export default function CameraScreen() {
               style={[
                 styles.progressLabel,
                 {
-                  color: "#f59e0b",
+                  color: Colors.info,
                 },
               ]}
             >
@@ -622,7 +628,7 @@ export default function CameraScreen() {
                   styles.progressBar,
                   {
                     width: `${activityDistribution.awakePct}%`,
-                    backgroundColor: "#EF9F27",
+                    backgroundColor: Colors.info,
                   },
                 ]}
               />
@@ -635,7 +641,7 @@ export default function CameraScreen() {
               style={[
                 styles.progressLabel,
                 {
-                  color: "#ef4444",
+                  color: Colors.critical,
                 },
               ]}
             >
@@ -649,7 +655,7 @@ export default function CameraScreen() {
                   styles.progressBar,
                   {
                     width: `${activityDistribution.cryingPct}%`,
-                    backgroundColor: "#E24B4A",
+                    backgroundColor: Colors.critical,
                   },
                 ]}
               />
@@ -657,7 +663,8 @@ export default function CameraScreen() {
           </View>
 
           <Text style={styles.streamNote}>
-            Live camera melalui frame JPEG terbaru · Tidak ada overlay deteksi
+            Tampilan langsung menggunakan gambar terbaru · Penanda deteksi tidak
+            ditampilkan
           </Text>
         </View>
       </View>
@@ -681,8 +688,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 18,
-    fontWeight: "700",
+    ...Typography.h2,
     color: "#fff",
   },
 
@@ -696,8 +702,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    borderRadius: 20,
-    paddingHorizontal: 10,
+    borderRadius: Radii.pill,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
   },
 
@@ -780,6 +786,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 12,
     right: 12,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 8,
     padding: 8,
@@ -829,8 +839,8 @@ const styles = StyleSheet.create({
 
   chartCard: {
     backgroundColor: "#161616",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 14,
     marginTop: 4,
   },

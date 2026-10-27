@@ -11,7 +11,8 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
-import { Fonts } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
+import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { DeviceConfig } from "../../types";
 import api from "../../services/api";
 
@@ -56,6 +57,9 @@ function SliderRow({
           style={[sliderStyles.btn, !canDecrease && sliderStyles.btnDisabled]}
           onPress={onDecrease}
           disabled={!canDecrease}
+          accessibilityRole="button"
+          accessibilityLabel={`Kurangi ${label.toLowerCase()}`}
+          accessibilityHint={`Mengurangi ${label.toLowerCase()} sebesar ${unit === "detik" ? "1 detik" : "10 detik"}`}
         >
           <Icon
             name="remove"
@@ -72,6 +76,9 @@ function SliderRow({
           style={[sliderStyles.btn, !canIncrease && sliderStyles.btnDisabled]}
           onPress={onIncrease}
           disabled={!canIncrease}
+          accessibilityRole="button"
+          accessibilityLabel={`Tambah ${label.toLowerCase()}`}
+          accessibilityHint={`Menambah ${label.toLowerCase()} sebesar ${unit === "detik" ? "1 detik" : "10 detik"}`}
         >
           <Icon
             name="add"
@@ -113,12 +120,8 @@ export default function DeviceConfigScreen() {
         notificationCooldownSec: config.notificationCooldownSec,
       });
       Alert.alert("Berhasil", "Konfigurasi perangkat berhasil disimpan.");
-    } catch (error: any) {
-      Alert.alert(
-        "Gagal",
-        error.response?.data?.error ||
-          "Konfigurasi perangkat tidak dapat disimpan.",
-      );
+    } catch {
+      Alert.alert("Gagal", "Pengaturan kamera tidak dapat disimpan. Coba lagi.");
     } finally {
       setIsSaving(false);
     }
@@ -149,8 +152,7 @@ export default function DeviceConfigScreen() {
 
       Alert.alert(
         "Gagal",
-        error.response?.data?.error ||
-          "Konfigurasi perangkat tidak dapat dimuat.",
+        "Pengaturan kamera tidak dapat dimuat. Periksa koneksi lalu coba lagi.",
       );
     } finally {
       setIsLoading(false);
@@ -187,6 +189,9 @@ export default function DeviceConfigScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerBack}
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+          accessibilityHint="Kembali ke halaman sebelumnya"
         >
           <Icon
             name="arrow-back"
@@ -199,7 +204,13 @@ export default function DeviceConfigScreen() {
           <Text style={styles.headerTitle}>Konfigurasi Perangkat</Text>
           <Text style={styles.headerSub}>{babyName ?? config.deviceId}</Text>
         </View>
-        <TouchableOpacity onPress={handleReset}>
+        <TouchableOpacity
+          onPress={handleReset}
+          style={styles.headerAction}
+          accessibilityRole="button"
+          accessibilityLabel="Reset konfigurasi"
+          accessibilityHint="Mengembalikan pengaturan ke nilai awal"
+        >
           <Icon
             name="refresh-outline"
             library="ionicons"
@@ -251,7 +262,7 @@ export default function DeviceConfigScreen() {
           </View>
           <View style={styles.card}>
             <SliderRow
-              label="Cooldown Notifikasi"
+              label="Jeda notifikasi"
               description="Jeda minimum antar notifikasi untuk kondisi yang sama"
               value={config.notificationCooldownSec}
               min={30}
@@ -324,9 +335,9 @@ const sliderStyles = StyleSheet.create({
   },
   control: { flexDirection: "row", alignItems: "center", gap: 4 },
   btn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    minWidth: ControlSize.minTouchTarget,
+    minHeight: ControlSize.minTouchTarget,
+    borderRadius: Radii.small,
     backgroundColor: Colors.secondaryLight,
     justifyContent: "center",
     alignItems: "center",
@@ -357,10 +368,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerBack: { padding: 4 },
+  headerBack: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  headerAction: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 16,
+    ...Typography.h3,
     color: Colors.secondaryDark,
   },
   headerSub: {
@@ -368,7 +379,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
   },
-  content: { padding: 20, gap: 20, paddingBottom: 40 },
+  content: { padding: Spacing.xl, gap: Spacing.xl, paddingBottom: 40 },
   section: { gap: 10 },
   sectionHeader: {
     flexDirection: "row",
@@ -376,14 +387,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 15,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   card: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -412,8 +422,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     backgroundColor: Colors.secondary,
-    borderRadius: 12,
-    paddingVertical: 15,
+    borderRadius: Radii.control,
+    minHeight: ControlSize.minTouchTarget,
   },
   saveBtnDisabled: { backgroundColor: "#B5D4F4" },
   saveBtnText: {

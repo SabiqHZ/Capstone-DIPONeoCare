@@ -11,7 +11,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.smartvision.mobile",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
@@ -61,7 +63,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "router": {},

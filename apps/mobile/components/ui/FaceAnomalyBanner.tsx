@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Icon } from './Icon';
-import { Colors } from '../../constants/colors';
-import { Fonts } from '../../constants/fonts';
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+
+import { Icon } from "./Icon";
+import { Typography } from "../../constants/fonts";
+import { Colors } from "../../constants/colors";
+import { Radii, Spacing } from "../../constants/ui";
 
 interface Props {
   visible: boolean;
@@ -9,21 +11,39 @@ interface Props {
 }
 
 export function FaceAnomalyBanner({ visible, onDismiss }: Props) {
-  if (!visible) return null;
+  if (!visible) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.iconBox}>
-        <Icon name="eye-off-outline" library="ionicons" size={22} color="#fff" />
+        <Icon
+          name="eye-off-outline"
+          library="ionicons"
+          size={22}
+          color="#FFFFFF"
+        />
       </View>
+
       <View style={styles.textBox}>
-        <Text style={styles.title}>Objek Anomali Terdeteksi</Text>
+        <Text style={styles.title}>Area wajah perlu diperiksa</Text>
+
         <Text style={styles.sub}>
-          Ada objek di area bayi. Segera periksa kondisi bayi!
+          Sistem mendeteksi ada objek di area wajah bayi. Periksa posisi bayi
+          dan pastikan wajah tetap terlihat.
         </Text>
       </View>
-      <TouchableOpacity onPress={onDismiss} style={styles.dismissBtn}>
-        <Icon name="close" library="ionicons" size={18} color="#fff" />
+
+      <TouchableOpacity
+        onPress={onDismiss}
+        style={styles.dismissBtn}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Sembunyikan peringatan area wajah"
+        accessibilityHint="Menutup pemberitahuan ini"
+      >
+        <Icon name="close" library="ionicons" size={18} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -31,34 +51,45 @@ export function FaceAnomalyBanner({ visible, onDismiss }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#7C3AED',
-    borderRadius: 14,
-    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    backgroundColor: Colors.warningDark,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     borderLeftWidth: 4,
-    borderLeftColor: '#5B21B6',
+    borderLeftColor: Colors.warningDark,
   },
+
   iconBox: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  textBox: { flex: 1, gap: 3 },
+
+  textBox: {
+    flex: 1,
+    gap: 3,
+  },
+
   title: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
-    color: '#fff',
+    ...Typography.h3,
+    color: "#FFFFFF",
   },
+
   sub: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 16,
+    ...Typography.caption,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.86)",
   },
-  dismissBtn: { padding: 4 },
+
+  dismissBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

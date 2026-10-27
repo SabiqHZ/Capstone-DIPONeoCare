@@ -11,11 +11,29 @@ export const Colors = {
   secondaryDark: '#0C447C',
   secondaryMid: '#185FA5',
 
-  // Semantic
+  // Semantic status colors
+  success: '#15803D',
+  successLight: '#ECFDF5',
+  successDark: '#085041',
+  warning: '#D97706',
+  warningLight: '#FFFBEB',
+  warningDark: '#92400E',
+  critical: '#B91C1C',
+  criticalLight: '#FEE2E2',
+  criticalDark: '#991B1B',
+  info: '#185FA5',
+  infoLight: '#E6F1FB',
+  infoDark: '#0C447C',
+  neutral: '#6B7280',
+  neutralLight: '#F3F4F6',
+  neutralDark: '#374151',
+  offline: '#6B7280',
+  offlineLight: '#F3F4F6',
+  offlineDark: '#4B5563',
+
+  // Backward-compatible aliases for existing UI
   danger: '#E24B4A',
   dangerLight: '#FCEBEB',
-  warning: '#EF9F27',
-  warningLight: '#FAEEDA',
 
   // Neutral
   white: '#FFFFFF',

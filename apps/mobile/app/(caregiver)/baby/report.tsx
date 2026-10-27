@@ -12,7 +12,8 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
-import { Fonts } from "../../../constants/fonts";
+import { Fonts, Typography } from "../../../constants/fonts";
+import { Radii, Spacing } from "../../../constants/ui";
 import { reportService } from "../../../services/report.service";
 import { ReportHistoryItem } from "../../../types";
 
@@ -123,7 +124,13 @@ export default function NurseBabyReportScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+          accessibilityHint="Kembali ke detail bayi"
+        >
           <Icon
             name="arrow-back"
             library="ionicons"
@@ -132,7 +139,7 @@ export default function NurseBabyReportScreen() {
           />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Laporan Harian AI</Text>
+          <Text style={styles.headerTitle}>Laporan Harian</Text>
           <Text style={styles.headerSub}>{babyName}</Text>
         </View>
         <View style={{ width: 32 }} />
@@ -156,7 +163,13 @@ export default function NurseBabyReportScreen() {
       >
         {/* Date picker */}
         <View style={styles.datePicker}>
-          <TouchableOpacity onPress={() => goDay(-1)} style={styles.dateBtn}>
+          <TouchableOpacity
+            onPress={() => goDay(-1)}
+            style={styles.dateBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Lihat hari sebelumnya"
+            accessibilityHint="Menampilkan laporan untuk satu hari sebelumnya"
+          >
             <Text style={styles.dateBtnText}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.dateText}>
@@ -171,6 +184,9 @@ export default function NurseBabyReportScreen() {
             onPress={() => goDay(1)}
             style={styles.dateBtn}
             disabled={isToday}
+            accessibilityRole="button"
+            accessibilityLabel="Lihat hari berikutnya"
+            accessibilityHint="Menampilkan laporan untuk satu hari berikutnya"
           >
             <Text
               style={[styles.dateBtnText, isToday && { color: Colors.border }]}
@@ -190,9 +206,9 @@ export default function NurseBabyReportScreen() {
               name="alert-circle-outline"
               library="ionicons"
               size={48}
-              color={Colors.danger}
+              color={Colors.critical}
             />
-            <Text style={styles.errorText}>ID bayi tidak tersedia. Kembali lalu pilih bayi yang ingin dilihat laporannya.</Text>
+            <Text style={styles.errorText}>Informasi bayi tidak tersedia. Kembali lalu pilih bayi yang ingin dilihat laporannya.</Text>
           </View>
         ) : isReportError ? (
           <View style={styles.centerBox}>
@@ -200,7 +216,7 @@ export default function NurseBabyReportScreen() {
               name="cloud-offline-outline"
               library="ionicons"
               size={48}
-              color={Colors.danger}
+              color={Colors.critical}
             />
             <Text style={styles.errorText}>
               Laporan gagal dimuat. Silakan coba lagi.
@@ -226,7 +242,7 @@ export default function NurseBabyReportScreen() {
               color={Colors.textDisabled}
             />
             <Text style={styles.emptyText}>
-              Belum ada data rekam AI untuk tanggal ini.
+              Belum ada catatan pemantauan untuk tanggal ini.
             </Text>
           </View>
         ) : (
@@ -236,10 +252,10 @@ export default function NurseBabyReportScreen() {
               <View
                 style={[
                   styles.summaryCard,
-                  { backgroundColor: Colors.primaryLight },
+                  { backgroundColor: Colors.successLight },
                 ]}
               >
-                <Text style={[styles.summaryVal, { color: Colors.primary }]}>
+                <Text style={[styles.summaryVal, { color: Colors.success }]}>
                   {formatDuration(report.totalSleepMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Tidur</Text>
@@ -247,10 +263,10 @@ export default function NurseBabyReportScreen() {
               <View
                 style={[
                   styles.summaryCard,
-                  { backgroundColor: Colors.warningLight },
+                  { backgroundColor: Colors.infoLight },
                 ]}
               >
-                <Text style={[styles.summaryVal, { color: Colors.warning }]}>
+                <Text style={[styles.summaryVal, { color: Colors.info }]}>
                   {formatDuration(report.totalAwakeMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Bangun</Text>
@@ -258,10 +274,10 @@ export default function NurseBabyReportScreen() {
               <View
                 style={[
                   styles.summaryCard,
-                  { backgroundColor: Colors.dangerLight },
+                  { backgroundColor: Colors.criticalLight },
                 ]}
               >
-                <Text style={[styles.summaryVal, { color: Colors.danger }]}>
+                <Text style={[styles.summaryVal, { color: Colors.critical }]}>
                   {formatDuration(report.totalCryingMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Menangis</Text>
@@ -376,9 +392,9 @@ export default function NurseBabyReportScreen() {
               <Text style={styles.cardTitle}>Distribusi Aktivitas per Jam</Text>
               <View style={styles.legend}>
                 {[
-                  { color: Colors.primary, label: "Tidur" },
-                  { color: Colors.warning, label: "Bangun" },
-                  { color: Colors.danger, label: "Menangis" },
+                  { color: Colors.success, label: "Tidur" },
+                  { color: Colors.info, label: "Bangun" },
+                  { color: Colors.critical, label: "Menangis" },
                 ].map((l) => (
                   <View key={l.label} style={styles.legendItem}>
                     <View
@@ -410,7 +426,7 @@ export default function NurseBabyReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: h.sleepMinutes,
-                                  backgroundColor: Colors.primary,
+                                  backgroundColor: Colors.success,
                                 },
                               ]}
                             />
@@ -421,7 +437,7 @@ export default function NurseBabyReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: h.awakeMinutes,
-                                  backgroundColor: Colors.warning,
+                                  backgroundColor: Colors.info,
                                 },
                               ]}
                             />
@@ -432,7 +448,7 @@ export default function NurseBabyReportScreen() {
                                 styles.barSeg,
                                 {
                                   flex: h.cryingMinutes,
-                                  backgroundColor: Colors.danger,
+                                  backgroundColor: Colors.critical,
                                 },
                               ]}
                             />
@@ -471,11 +487,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { padding: 4 },
+  backBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   headerCenter: { alignItems: "center" },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 16,
+    ...Typography.h3,
     color: Colors.secondaryDark,
   },
   headerSub: {
@@ -492,7 +507,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 4,
   },
-  dateBtn: { padding: 10 },
+  dateBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   dateBtnText: { fontSize: 24, color: Colors.secondary, fontWeight: "700" },
   dateText: {
     flex: 1,
@@ -515,7 +530,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: Fonts.interRegular,
     fontSize: 14,
-    color: Colors.danger,
+    color: Colors.critical,
     textAlign: "center",
   },
   retryButton: {
@@ -534,8 +549,8 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: "row", gap: 10 },
   summaryCard: {
     flex: 1,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: Radii.control,
+    padding: Spacing.md,
     alignItems: "center",
     gap: 4,
   },
@@ -618,17 +633,16 @@ const styles = StyleSheet.create({
   historyError: {
     fontFamily: Fonts.interRegular,
     fontSize: 12,
-    color: Colors.danger,
+    color: Colors.critical,
   },
   card: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 12,
   },
   cardTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 14,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   legend: { flexDirection: "row", gap: 14, flexWrap: "wrap" },

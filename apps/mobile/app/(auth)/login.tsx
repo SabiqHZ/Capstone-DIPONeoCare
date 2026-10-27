@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { useAuthStore } from '../../stores/auth.store';
 import { authService } from '../../services/auth.service';
+import { Typography } from '../../constants/fonts';
 
 // --- Komponen SVG ---
 const EyeIcon = ({ color = "#9CA3AF", size = 22 }) => (
@@ -33,7 +34,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Lengkapi Data', 'Username dan password wajib diisi.');
+      Alert.alert('Lengkapi Data', 'Nama pengguna dan kata sandi wajib diisi.');
       return;
     }
     setIsLoading(true);
@@ -42,7 +43,7 @@ export default function LoginScreen() {
       await setUser(user);
       router.replace('/(caregiver)/dashboard');
     } catch (err: any) {
-      Alert.alert('Login Gagal', err.message || 'Username atau password salah.');
+      Alert.alert('Gagal masuk', err.message || 'Nama pengguna atau kata sandi salah.');
     } finally {
       setIsLoading(false);
     }
@@ -67,18 +68,18 @@ export default function LoginScreen() {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.title}>Portal Pengasuh</Text>
+            <Text style={styles.title}>Masuk Pengasuh</Text>
             <Text style={styles.subtitle}>Smart Vision Daycare</Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.field}>
-              <Text style={styles.label}>Username</Text>
+              <Text style={styles.label}>Nama pengguna</Text>
               <TextInput
                 style={styles.input}
                 value={username}
                 onChangeText={setUsername}
-                placeholder="Masukkan username"
+                placeholder="Masukkan nama pengguna"
                 placeholderTextColor="#9CA3AF"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -87,13 +88,13 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>Kata sandi</Text>
               <View>
                 <TextInput
                   style={styles.input}
                   value={password}
                   onChangeText={setPassword}
-                  placeholder="Masukkan password"
+                  placeholder="Masukkan kata sandi"
                   placeholderTextColor="#9CA3AF"
                   secureTextEntry={!showPass}
                   autoCapitalize="none"
@@ -103,6 +104,9 @@ export default function LoginScreen() {
                   style={styles.eyeBtn}
                   onPress={() => setShowPass(!showPass)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPass ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  accessibilityHint={showPass ? "Menyamarkan kata sandi di kolom" : "Menampilkan kata sandi di kolom"}
                 >
                   {showPass ? <EyeOffIcon /> : <EyeIcon />}
                 </TouchableOpacity>
@@ -142,8 +146,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logoImage: { width: 85, height: 85 },
-  title: { fontSize: 24, fontWeight: '700', color: '#0C447C', letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: '#185FA5' },
+  title: { ...Typography.h1, color: '#0C447C', letterSpacing: -0.5 },
+  subtitle: { ...Typography.body, color: '#185FA5' },
   card: {
     backgroundColor: '#fff', borderRadius: 20, padding: 28, gap: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
@@ -159,8 +163,11 @@ const styles = StyleSheet.create({
   eyeBtn: { 
     position: 'absolute', 
     right: 14, 
-    top: 10, 
-    padding: 2 
+    top: 0,
+    width: 44,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   btn: { backgroundColor: '#378ADD', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   btnDisabled: { backgroundColor: '#B5D4F4' },

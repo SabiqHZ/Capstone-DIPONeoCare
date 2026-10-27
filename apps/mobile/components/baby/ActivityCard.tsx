@@ -1,8 +1,11 @@
 import { View, Text, StyleSheet } from "react-native";
+
 import { Icon } from "../ui/Icon";
 import { BabyActivity, FaceAnomaly, SoundClass } from "../../types";
+
 import { Colors } from "../../constants/colors";
-import { Fonts } from "../../constants/fonts";
+import { Typography } from "../../constants/fonts";
+import { Radii, Spacing } from "../../constants/ui";
 
 interface Props {
   activity: BabyActivity | null;
@@ -15,8 +18,8 @@ const activityConfig = {
   sleeping: {
     label: "Tidur",
     desc: "Bayi sedang tidur dengan tenang",
-    color: Colors.primary,
-    bg: Colors.primaryLight,
+    color: Colors.success,
+    bg: Colors.successLight,
     icon: "sleep",
     iconLib: "material" as const,
   },
@@ -24,8 +27,8 @@ const activityConfig = {
   awake: {
     label: "Bangun",
     desc: "Bayi sedang terjaga",
-    color: Colors.primary,
-    bg: Colors.primaryLight,
+    color: Colors.info,
+    bg: Colors.infoLight,
     icon: "eye-outline",
     iconLib: "ionicons" as const,
   },
@@ -33,17 +36,17 @@ const activityConfig = {
   crying: {
     label: "Menangis",
     desc: "Bayi terdeteksi menangis",
-    color: Colors.danger,
-    bg: Colors.dangerLight,
+    color: Colors.critical,
+    bg: Colors.criticalLight,
     icon: "emoticon-cry-outline",
     iconLib: "material" as const,
   },
 
   unknown: {
-    label: "Menunggu data AI",
-    desc: "Belum ada hasil analisis aktivitas bayi",
-    color: Colors.textMuted,
-    bg: Colors.borderLight,
+    label: "Data belum tersedia",
+    desc: "Belum ada pembaruan kondisi bayi",
+    color: Colors.neutral,
+    bg: Colors.neutralLight,
     icon: "help-circle-outline",
     iconLib: "ionicons" as const,
   },
@@ -51,21 +54,21 @@ const activityConfig = {
 
 const soundConfig = {
   crying: {
-    label: "Tangisan Terdeteksi",
-    color: Colors.danger,
-    bg: Colors.dangerLight,
+    label: "Tangisan terdeteksi",
+    color: Colors.critical,
+    bg: Colors.criticalLight,
   },
 
   not_crying: {
-    label: "Tidak Menangis",
-    color: Colors.primary,
-    bg: Colors.primaryLight,
+    label: "Tidak menangis",
+    color: Colors.success,
+    bg: Colors.successLight,
   },
 
   unknown: {
-    label: "Menunggu hasil audio AI",
-    color: Colors.textMuted,
-    bg: Colors.borderLight,
+    label: "Data suara belum tersedia",
+    color: Colors.neutral,
+    bg: Colors.neutralLight,
   },
 };
 
@@ -81,11 +84,30 @@ export function ActivityCard({
   const actCfg = activityConfig[activityKey];
   const sndCfg = soundConfig[soundKey];
 
+  const hasFaceAnomaly = Boolean(faceAnomaly) && faceAnomaly !== "none";
+
+  const hasCrying = activity === "crying" || soundClass === "crying";
+
+  const formattedConfidence =
+    typeof soundConfidence === "number" &&
+    Number.isFinite(soundConfidence) &&
+    soundConfidence > 0
+      ? Math.round(soundConfidence * 100)
+      : null;
+
   return (
-    <View style={[styles.card, { backgroundColor: actCfg.bg }]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: actCfg.bg,
+        },
+      ]}
+    >
       <View style={styles.top}>
         <View style={styles.left}>
-          <Text style={styles.cardLabel}>Aktivitas Bayi</Text>
+          <Text style={styles.cardLabel}>Kondisi saat ini</Text>
+
           <View style={styles.activityRow}>
             <Icon
               name={actCfg.icon}
@@ -93,16 +115,33 @@ export function ActivityCard({
               size={28}
               color={actCfg.color}
             />
-            <Text style={[styles.activityLabel, { color: actCfg.color }]}>
+
+            <Text
+              style={[
+                styles.activityLabel,
+                {
+                  color: actCfg.color,
+                },
+              ]}
+            >
               {actCfg.label}
             </Text>
           </View>
+
           <Text style={styles.activityDesc}>{actCfg.desc}</Text>
         </View>
       </View>
 
       {/* Status suara */}
-      <View style={[styles.soundBadge, { backgroundColor: sndCfg.bg }]}>
+
+      <View
+        style={[
+          styles.soundBadge,
+          {
+            backgroundColor: sndCfg.bg,
+          },
+        ]}
+      >
         <Icon
           name={
             soundClass === "crying"
@@ -112,37 +151,55 @@ export function ActivityCard({
                 : "help-circle-outline"
           }
           library="ionicons"
-          size={14}
+          size={15}
           color={sndCfg.color}
         />
-        <Text style={[styles.soundLabel, { color: sndCfg.color }]}>
+
+        <Text
+          style={[
+            styles.soundLabel,
+            {
+              color: sndCfg.color,
+            },
+          ]}
+        >
           {sndCfg.label}
         </Text>
-        {soundClass === "crying" &&
-        typeof soundConfidence === "number" &&
-        soundConfidence > 0 ? (
-          <Text style={[styles.soundConf, { color: sndCfg.color }]}>
-            {Math.round(soundConfidence * 100)}%
+
+        {formattedConfidence !== null ? (
+          <Text
+            style={[
+              styles.soundConf,
+              {
+                color: sndCfg.color,
+              },
+            ]}
+          >
+            Tingkat keyakinan {formattedConfidence}%
           </Text>
         ) : null}
       </View>
 
-      {/* Alert strip */}
-      {faceAnomaly && faceAnomaly !== "none" ? (
-        <View style={styles.alertStrip}>
+      {/* Face anomaly */}
+
+      {hasFaceAnomaly ? (
+        <View style={styles.warningStrip}>
           <Icon
             name="alert-circle"
             library="ionicons"
             size={16}
             color={Colors.white}
           />
-          <Text style={styles.alertText}>
-            Perlu perhatian — {faceAnomaly} terdeteksi di area bayi
+
+          <Text style={styles.warningText}>
+            Perlu perhatian — ada objek di area bayi
           </Text>
         </View>
       ) : null}
 
-      {activity === "crying" ? (
+      {/* Crying */}
+
+      {hasCrying ? (
         <View style={styles.alertStrip}>
           <Icon
             name="alert-circle"
@@ -150,6 +207,7 @@ export function ActivityCard({
             size={16}
             color={Colors.white}
           />
+
           <Text style={styles.alertText}>
             Perlu perhatian — bayi sedang menangis
           </Text>
@@ -160,85 +218,90 @@ export function ActivityCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, padding: 20, gap: 12 },
+  card: {
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
+    gap: Spacing.md,
+  },
+
   top: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  left: { gap: 6, flex: 1 },
-  right: { alignItems: "flex-end", gap: 8 },
+
+  left: {
+    gap: 6,
+    flex: 1,
+  },
+
   cardLabel: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 12,
+    ...Typography.captionStrong,
     color: Colors.textMuted,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  activityRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
   activityLabel: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 24,
+    ...Typography.h1,
   },
+
   activityDesc: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 12,
+    ...Typography.caption,
     color: Colors.textMuted,
   },
-  nvBadge: {
-    backgroundColor: "#1a1a2e",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  nvText: {
-    fontFamily: Fonts.interMedium,
-    fontSize: 10,
-    color: "#a78bfa",
-  },
+
   soundBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
   },
+
   soundLabel: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
+    ...Typography.bodyStrong,
     flex: 1,
   },
+
   soundConf: {
-    fontFamily: Fonts.interMedium,
-    fontSize: 12,
+    ...Typography.captionStrong,
   },
+
   alertStrip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.danger,
+    backgroundColor: Colors.critical,
     borderRadius: 8,
     padding: 10,
   },
+
   alertText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
+    ...Typography.bodyStrong,
     color: Colors.white,
     flex: 1,
   },
-  faceAnomalyStrip: {
+
+  warningStrip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#7C3AED",
+    backgroundColor: Colors.warningDark,
     borderRadius: 8,
     padding: 10,
   },
-  faceAnomalyText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
-    color: "#fff",
+
+  warningText: {
+    ...Typography.bodyStrong,
+    color: Colors.white,
     flex: 1,
   },
 });

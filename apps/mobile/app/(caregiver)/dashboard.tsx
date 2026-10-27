@@ -17,10 +17,12 @@ import { useRouter } from "expo-router";
 import { useAuthStore } from "../../stores/auth.store";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
-import { Fonts } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
+import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { babyService } from "../../services/baby.service";
 import { Baby } from "../../types";
 import { MuteToggle } from "../../components/ui/MuteToggle";
+import { ActionButton } from "../../components/ui/ActionButton";
 // INJEKSI REALTIME: Import context
 import { useAllBabyStatuses } from "../../context/BabyContext";
 
@@ -32,8 +34,8 @@ type BabyListFilter = "all" | "crying" | "anomaly" | "offline";
 const BABY_LIST_FILTERS: { key: BabyListFilter; label: string }[] = [
   { key: "all", label: "Semua" },
   { key: "crying", label: "Menangis" },
-  { key: "anomaly", label: "Anomali" },
-  { key: "offline", label: "Offline" },
+  { key: "anomaly", label: "Perlu diperiksa" },
+  { key: "offline", label: "Tidak aktif" },
 ];
 
 interface BabyWithStatus extends Baby {
@@ -58,13 +60,13 @@ const activityLabel: Record<string, string> = {
   sleeping: "Tidur",
   awake: "Bangun",
   crying: "Menangis",
-  unknown: "Menunggu data AI",
+  unknown: "Menunggu hasil pemantauan",
 };
 const activityColor: Record<string, string> = {
-  sleeping: Colors.primary,
-  awake: Colors.warning,
-  crying: Colors.danger,
-  unknown: Colors.textMuted,
+  sleeping: Colors.success,
+  awake: Colors.info,
+  crying: Colors.critical,
+  unknown: Colors.neutral,
 };
 
 function BabyCard({
@@ -101,10 +103,10 @@ function BabyCard({
   const activityKey = activity ?? "unknown";
 
   const borderColor = faceCovered
-    ? "#7C3AED"
+    ? Colors.warning
     : isCrying
-      ? Colors.danger
-      : Colors.primary;
+      ? Colors.critical
+      : Colors.success;
 
   return (
     <TouchableOpacity
@@ -125,7 +127,7 @@ function BabyCard({
         />
 
         {faceCovered ? (
-          <View style={[styles.nvPill, { backgroundColor: "#5B21B6" }]}>
+          <View style={[styles.nvPill, { backgroundColor: Colors.warningDark }]}>
             <Icon
               name="eye-off-outline"
               library="ionicons"
@@ -139,22 +141,22 @@ function BabyCard({
         <View
           style={[
             styles.onlinePill,
-            { backgroundColor: isOnline ? "#052e16" : Colors.borderLight },
+            { backgroundColor: isOnline ? Colors.successLight : Colors.offlineLight },
           ]}
         >
           <View
             style={[
               styles.onlineDot,
-              { backgroundColor: isOnline ? "#4ade80" : Colors.textDisabled },
+              { backgroundColor: isOnline ? Colors.success : Colors.offline },
             ]}
           />
           <Text
             style={[
               styles.onlinePillText,
-              { color: isOnline ? "#4ade80" : Colors.textDisabled },
+              { color: isOnline ? Colors.successDark : Colors.offlineDark },
             ]}
           >
-            {isOnline ? "Live" : "Offline"}
+            {isOnline ? "Aktif" : "Tidak aktif"}
           </Text>
         </View>
       </View>
@@ -163,7 +165,7 @@ function BabyCard({
         <Text style={styles.cardName} numberOfLines={1}>
           {baby.name}
         </Text>
-        <Text style={styles.cardBed}>Bed {baby.bed_number}</Text>
+        <Text style={styles.cardBed}>Tempat tidur {baby.bed_number}</Text>
 
         <View
           style={[
@@ -189,9 +191,9 @@ function BabyCard({
               name="emoticon-cry-outline"
               library="material"
               size={12}
-              color={Colors.danger}
+              color={Colors.critical}
             />
-            <Text style={[styles.statText, { color: Colors.danger }]}>
+            <Text style={[styles.statText, { color: Colors.critical }]}>
               Menangis
               {cryingSec != null ? ` ${cryingSec}s` : ""}
             </Text>
@@ -227,8 +229,8 @@ export default function NurseDashboard() {
       setError(null);
       const data = await babyService.getBabies();
       setBabies(data as BabyWithStatus[]);
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || "Gagal memuat data");
+    } catch {
+      setError("Tidak dapat memuat daftar bayi. Periksa koneksi lalu coba lagi.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -248,8 +250,6 @@ export default function NurseDashboard() {
     await logout();
     router.replace("/(auth)/code-entry");
   };
-
-  if (!user || user.role !== "caregiver") return null;
 
   // INJEKSI REALTIME: Menghitung rekapitulasi berdasarkan data real-time jika tersedia
   const { cryingCount, faceAnomalyCount, onlineCount } = useMemo(() => {
@@ -343,11 +343,13 @@ export default function NurseDashboard() {
       .map(({ baby }) => baby);
   }, [babies, searchQuery, activeFilter, realtimeStatuses]);
 
+  if (!user || user.role !== "caregiver") return null;
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Dashboard</Text>
+          <Text style={styles.headerTitle}>Beranda</Text>
           <Text style={styles.headerSub}>{user.name}</Text>
         </View>
 
@@ -371,6 +373,9 @@ export default function NurseDashboard() {
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => setIsMenuVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Tambah bayi atau kamera"
+            accessibilityHint="Membuka menu pendaftaran bayi dan konfigurasi kamera"
           >
             <Icon
               name="add-circle"
@@ -380,7 +385,13 @@ export default function NurseDashboard() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleLogout}>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Keluar dari akun"
+            accessibilityHint="Mengakhiri sesi pengasuh"
+          >
             <Icon
               name="log-out-outline"
               library="ionicons"
@@ -398,24 +409,24 @@ export default function NurseDashboard() {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNum, { color: Colors.primary }]}>
+          <Text style={[styles.summaryNum, { color: Colors.success }]}>
             {onlineCount}
           </Text>
-          <Text style={styles.summaryLabel}>Online</Text>
+          <Text style={styles.summaryLabel}>Kamera aktif</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNum, { color: Colors.danger }]}>
+          <Text style={[styles.summaryNum, { color: Colors.critical }]}>
             {cryingCount}
           </Text>
           <Text style={styles.summaryLabel}>Menangis</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNum, { color: "#3f384aff" }]}>
+          <Text style={[styles.summaryNum, { color: Colors.warningDark }]}>
             {faceAnomalyCount}
           </Text>
-          <Text style={styles.summaryLabel}>Anomali</Text>
+          <Text style={styles.summaryLabel}>Perlu diperiksa</Text>
         </View>
       </View>
 
@@ -440,10 +451,11 @@ export default function NurseDashboard() {
             />
             {searchQuery.length > 0 ? (
               <TouchableOpacity
+                style={styles.clearSearchBtn}
                 accessibilityRole="button"
                 accessibilityLabel="Hapus pencarian"
+                accessibilityHint="Mengosongkan kata pencarian bayi"
                 onPress={() => setSearchQuery("")}
-                hitSlop={8}
               >
                 <Icon
                   name="close-circle"
@@ -482,7 +494,7 @@ export default function NurseDashboard() {
             })}
           </ScrollView>
           <Text style={styles.priorityHint}>
-            Urutan otomatis: menangis dan anomali diprioritaskan, lalu menangis, kemudian anomali.
+            Bayi yang menangis atau memiliki kondisi wajah yang perlu diperiksa ditampilkan lebih dahulu.
           </Text>
         </View>
       ) : null}
@@ -501,9 +513,13 @@ export default function NurseDashboard() {
             color={Colors.textDisabled}
           />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchBabies}>
+          <ActionButton
+            variant="caregiver"
+            style={styles.retryBtn}
+            onPress={fetchBabies}
+          >
             <Text style={styles.retryText}>Coba Lagi</Text>
-          </TouchableOpacity>
+          </ActionButton>
         </View>
       ) : babies.length === 0 ? (
         <View style={styles.centerBox}>
@@ -658,8 +674,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 22,
+    ...Typography.h1,
     color: Colors.secondaryDark,
   },
   headerSub: {
@@ -673,7 +688,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.danger,
+    backgroundColor: Colors.critical,
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -683,7 +698,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.white,
   },
-  addBtn: { padding: 2 },
+  addBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  logoutBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  clearSearchBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   summaryBar: {
     flexDirection: "row",
     backgroundColor: Colors.white,
@@ -740,10 +757,10 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   filterChip: {
-    minHeight: 36,
+    minHeight: ControlSize.minTouchTarget,
     justifyContent: "center",
     paddingHorizontal: 14,
-    borderRadius: 18,
+    borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
@@ -781,7 +798,9 @@ const styles = StyleSheet.create({
   },
   resetFilterBtn: {
     backgroundColor: Colors.secondary,
-    borderRadius: 10,
+    minHeight: ControlSize.minTouchTarget,
+    justifyContent: "center",
+    borderRadius: Radii.control,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginTop: 4,
@@ -790,7 +809,7 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: Radii.card,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -801,7 +820,7 @@ const styles = StyleSheet.create({
   faceWarning: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 10,
-    color: "#7C3AED",
+    color: Colors.warningDark,
   },
   cardOffline: { opacity: 0.6 },
   cardThumb: {
@@ -819,7 +838,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 3,
     backgroundColor: "#1a1a2e",
-    borderRadius: 10,
+    borderRadius: Radii.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
@@ -831,16 +850,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    borderRadius: 10,
+    borderRadius: Radii.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
   onlineDot: { width: 6, height: 6, borderRadius: 3 },
   onlinePillText: { fontFamily: Fonts.interMedium, fontSize: 9 },
-  cardInfo: { padding: 12, gap: 6 },
+  cardInfo: { padding: Spacing.md, gap: Spacing.sm },
   cardName: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 14,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   cardBed: {
@@ -880,10 +898,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   retryBtn: {
-    backgroundColor: Colors.secondary,
-    borderRadius: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    alignSelf: "center",
     marginTop: 8,
   },
   retryText: {
@@ -892,8 +907,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   emptyTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   emptyText: {

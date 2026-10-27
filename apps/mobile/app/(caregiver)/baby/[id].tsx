@@ -14,7 +14,8 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
-import { Fonts } from "../../../constants/fonts";
+import { Fonts, Typography } from "../../../constants/fonts";
+import { Radii, Spacing } from "../../../constants/ui";
 import { AlertBanner } from "../../../components/ui/AlertBanner";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
 import { babyService } from "../../../services/baby.service";
@@ -83,10 +84,8 @@ export default function BabyDetailScreen() {
       setError(null);
       const data = await babyService.getBabyById(id);
       setBaby(data as BabyDetail);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || err.message || "Gagal memuat data",
-      );
+    } catch {
+      setError("Tidak dapat memuat informasi bayi. Periksa koneksi lalu coba lagi.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -240,13 +239,13 @@ export default function BabyDetailScreen() {
 
   const handleDischarge = () => {
     if (!id) {
-      Alert.alert("Gagal", "ID bayi tidak ditemukan.");
+      Alert.alert("Gagal", "Informasi bayi tidak ditemukan.");
       return;
     }
 
     Alert.alert(
       "Keluarkan Pasien",
-      `Yakin ingin mengeluarkan ${baby?.name} dari sistem? Semua relasi perangkat akan diputus.`,
+      `Yakin ingin mengeluarkan ${baby?.name} dari sistem? Kamera yang terhubung akan dilepas dari bayi ini.`,
       [
         {
           text: "Batal",
@@ -264,7 +263,7 @@ export default function BabyDetailScreen() {
                 "Pasien berhasil dikeluarkan dari sistem.",
                 [
                   {
-                    text: "OK",
+                    text: "Baik",
                     onPress: () => {
                       router.replace("/(caregiver)/dashboard");
                     },
@@ -279,8 +278,7 @@ export default function BabyDetailScreen() {
 
               Alert.alert(
                 "Gagal",
-                err.response?.data?.error ||
-                  "Tidak dapat mengeluarkan pasien saat ini.",
+                "Tidak dapat mengeluarkan bayi saat ini. Coba lagi.",
               );
             }
           },
@@ -354,7 +352,13 @@ export default function BabyDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+          accessibilityHint="Kembali ke daftar bayi"
+        >
           <Icon
             name="arrow-back"
             library="ionicons"
@@ -369,6 +373,9 @@ export default function BabyDetailScreen() {
           onPress={handleDeviceConfig}
           style={styles.configBtn}
           disabled={!isDevicePaired}
+          accessibilityRole="button"
+          accessibilityLabel="Konfigurasi kamera"
+          accessibilityHint="Membuka pengaturan kamera bayi"
         >
           <Icon
             name="settings-outline"
@@ -443,7 +450,7 @@ export default function BabyDetailScreen() {
               } catch {
                 Alert.alert(
                   "Gagal",
-                  "Alert belum dapat ditandai sebagai sudah ditangani.",
+                  "Peringatan belum dapat ditandai sebagai sudah ditangani.",
                 );
               }
             }}
@@ -504,7 +511,7 @@ export default function BabyDetailScreen() {
                       {hasStreamError ? (
                         <>
                           <Text style={styles.offlineText}>
-                            Belum menerima frame kamera
+                            Belum menerima gambar kamera
                           </Text>
                           <Text style={styles.offlineSub}>
                             Mencoba kembali secara otomatis...
@@ -517,12 +524,12 @@ export default function BabyDetailScreen() {
                             size="large"
                           />
                           <Text style={styles.waitingText}>
-                            Menunggu frame kamera...
+                            Memuat gambar kamera...
                           </Text>
                         </>
                       )}
                       <Text style={styles.offlineText}>
-                        Terakhir online:{" "}
+                        Pembaruan terakhir perangkat:{" "}
                         {baby.devices?.last_heartbeat
                           ? new Date(
                               baby.devices.last_heartbeat,
@@ -542,7 +549,7 @@ export default function BabyDetailScreen() {
               ) : hasStreamError ? (
                 <View style={styles.cameraMessageOverlay}>
                   <Text style={styles.offlineText}>
-                    Gagal menyiapkan stream kamera
+                    Gagal menyiapkan tampilan kamera langsung
                   </Text>
                   <TouchableOpacity
                     style={styles.retryBtn}
@@ -554,7 +561,7 @@ export default function BabyDetailScreen() {
               ) : (
                 <View style={styles.cameraMessageOverlay}>
                   <Text style={styles.offlineText}>
-                    Stream kamera belum tersedia
+                    Tampilan kamera langsung belum tersedia
                   </Text>
                   <Text style={styles.offlineSub}>
                     Periksa pemasangan dan koneksi perangkat kamera.
@@ -564,7 +571,7 @@ export default function BabyDetailScreen() {
 
               {hasFrame ? (
                 <View style={styles.liveBadge}>
-                  <Text style={styles.liveText}>🔴 LIVE</Text>
+                  <Text style={styles.liveText}>🔴 LANGSUNG</Text>
                 </View>
               ) : null}
             </View>
@@ -587,12 +594,12 @@ export default function BabyDetailScreen() {
                   }
                   library="material"
                   size={24}
-                  color={isCrying === true ? Colors.danger : Colors.primary}
+                  color={isCrying === true ? Colors.critical : Colors.success}
                 />
                 <Text style={styles.aiCardLabel}>Suara</Text>
                 <Text style={styles.aiCardValue}>
                   {isCrying === null
-                    ? "Menunggu data AI"
+                    ? "Menunggu hasil pemantauan"
                     : isCrying
                       ? `Menangis${
                           cryingDurationSec != null
@@ -621,21 +628,21 @@ export default function BabyDetailScreen() {
                   size={24}
                   color={
                     faceStatusUnknown
-                      ? Colors.textMuted
+                      ? Colors.neutral
                       : faceCovered
                         ? Colors.warning
-                        : Colors.primary
+                        : Colors.success
                   }
                 />
-                <Text style={styles.aiCardLabel}>Wajah (YOLO)</Text>
+                <Text style={styles.aiCardLabel}>Kondisi wajah</Text>
                 <Text
                   style={[
                     styles.aiCardValue,
-                    faceStatusUnknown && { color: Colors.textMuted },
+                    faceStatusUnknown && { color: Colors.neutral },
                   ]}
                 >
                   {faceStatusUnknown
-                    ? "Menunggu data AI"
+                    ? "Menunggu hasil pemantauan"
                     : faceCovered
                       ? "Tertutup!"
                       : "Terlihat"}
@@ -647,12 +654,12 @@ export default function BabyDetailScreen() {
                   name="body-outline"
                   library="ionicons"
                   size={24}
-                  color={Colors.primary}
+                  color={Colors.success}
                 />
                 <Text style={styles.aiCardLabel}>Aktivitas</Text>
                 <Text style={styles.aiCardValue}>
                   {activity === null
-                    ? "Menunggu data AI"
+                    ? "Menunggu hasil pemantauan"
                     : activity === "sleeping"
                       ? "Tidur"
                       : activity === "awake"
@@ -665,7 +672,7 @@ export default function BabyDetailScreen() {
               Diperbarui:{" "}
               {lastUpdated
                 ? new Date(lastUpdated).toLocaleTimeString("id-ID")
-                : "Menunggu data AI"}
+                : "Menunggu hasil pemantauan"}
             </Text>
 
             <View style={styles.deviceCard}>
@@ -683,13 +690,13 @@ export default function BabyDetailScreen() {
               <View style={styles.infoGrid}>
                 <InfoItem
                   icon="wifi"
-                  label="MAC Address"
-                  value={baby.devices?.mac_address ?? "Terhubung (Live)"}
+                  label="Kode kamera"
+                  value={baby.devices?.mac_address ?? "Terhubung"}
                   mono
                 />
                 <InfoItem
                   icon="mic-outline"
-                  label="Cooldown Notifikasi"
+                  label="Jeda notifikasi"
                   value={`${baby.devices?.notification_cooldown_sec ?? 60} detik`}
                 />
               </View>
@@ -707,7 +714,7 @@ export default function BabyDetailScreen() {
                     name="bar-chart-outline"
                     library="ionicons"
                     size={16}
-                    color={Colors.primary}
+                    color={Colors.success}
                   />
                   <Text style={styles.reportBtnText}>Laporan</Text>
                 </TouchableOpacity>
@@ -726,7 +733,7 @@ export default function BabyDetailScreen() {
               name="exit-outline"
               library="ionicons"
               size={18}
-              color={Colors.danger}
+              color={Colors.critical}
             />
             <Text style={styles.dischargeBtnText}>Keluarkan Pasien</Text>
           </TouchableOpacity>
@@ -741,7 +748,13 @@ function Header({ backOnly, title }: { backOnly: boolean; title: string }) {
   const router = useRouter();
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.backBtn}
+        accessibilityRole="button"
+        accessibilityLabel="Kembali"
+        accessibilityHint="Kembali ke halaman sebelumnya"
+      >
         <Icon
           name="arrow-back"
           library="ionicons"
@@ -816,17 +829,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { padding: 4 },
+  backBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   headerTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
+    ...Typography.h2,
     color: Colors.secondaryDark,
     flex: 1,
     textAlign: "center",
     marginHorizontal: 8,
   },
-  configBtn: { padding: 4 },
-  content: { padding: 16, gap: 14, paddingBottom: 40 },
+  configBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
   centerBox: {
     flex: 1,
     justifyContent: "center",
@@ -847,7 +859,9 @@ const styles = StyleSheet.create({
   },
   retryBtn: {
     backgroundColor: Colors.secondary,
-    borderRadius: 10,
+    minHeight: 44,
+    justifyContent: "center",
+    borderRadius: Radii.control,
     paddingHorizontal: 24,
     paddingVertical: 10,
   },
@@ -858,8 +872,8 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
     gap: 14,
     elevation: 2,
   },
@@ -878,8 +892,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoName: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   infoBed: {
@@ -891,14 +904,13 @@ const styles = StyleSheet.create({
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   noPairBox: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: Radii.card,
     padding: 28,
     alignItems: "center",
     gap: 12,
   },
   noPairTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 16,
+    ...Typography.h3,
     color: Colors.textPrimary,
   },
   noPairText: {
@@ -909,7 +921,7 @@ const styles = StyleSheet.create({
   },
   waitingBox: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: Radii.card,
     padding: 24,
     alignItems: "center",
     gap: 10,
@@ -1008,9 +1020,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cryActive: {
-    backgroundColor: Colors.dangerLight,
+    backgroundColor: Colors.criticalLight,
     borderWidth: 1,
-    borderColor: Colors.danger,
+    borderColor: Colors.critical,
   },
   anomalyActive: {
     backgroundColor: Colors.warningLight,
@@ -1070,12 +1082,12 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.dangerLight,
+    borderColor: Colors.criticalLight,
   },
   dangerTitle: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 12,
-    color: Colors.danger,
+    color: Colors.critical,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1084,7 +1096,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1.5,
-    borderColor: Colors.danger,
+    borderColor: Colors.critical,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -1093,6 +1105,6 @@ const styles = StyleSheet.create({
   dischargeBtnText: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 13,
-    color: Colors.danger,
+    color: Colors.critical,
   },
 });
