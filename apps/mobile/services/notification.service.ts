@@ -1,4 +1,5 @@
 import type * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -11,7 +12,7 @@ let isHandlerConfigured = false;
 
 /** Expo Go cannot load Android remote-push APIs from SDK 53 onward. */
 export function getNotificationsModule(): NotificationsModule | null {
-  if (Constants.executionEnvironment === 'storeClient') {
+  if (isRunningInExpoGo()) {
     return null;
   }
 

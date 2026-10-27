@@ -22,7 +22,9 @@ export default function ReportScreen() {
   const [report, setReport] = useState<DailyReport | null>(null);
   const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [isHistoryError, setIsHistoryError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReportError, setIsReportError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -31,6 +33,7 @@ export default function ReportScreen() {
   const fetchReport = useCallback(async () => {
     if (!babyId) {
       setReport(null);
+      setIsReportError(false);
       setIsLoading(false);
       setIsRefreshing(false);
       return;
@@ -38,10 +41,13 @@ export default function ReportScreen() {
 
     try {
       const data = await reportService.getDailyReport(babyId, selectedDate);
-      setReport(data);
+      // Respons sukses tanpa payload diperlakukan sebagai laporan kosong.
+      setReport(data ?? null);
+      setIsReportError(false);
     } catch (error) {
       console.error("[ParentReport] Gagal memuat laporan:", error);
       setReport(null);
+      setIsReportError(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -50,16 +56,19 @@ export default function ReportScreen() {
   const fetchReportHistory = useCallback(async () => {
     if (!babyId) {
       setReportHistory([]);
+      setIsHistoryError(false);
       setIsHistoryLoading(false);
       return;
     }
 
     try {
       const data = await reportService.getReportList(babyId);
-      setReportHistory(data);
+      setReportHistory(data ?? []);
+      setIsHistoryError(false);
     } catch (error) {
       console.error("[ParentReport] Gagal memuat riwayat laporan:", error);
       setReportHistory([]);
+      setIsHistoryError(true);
     } finally {
       setIsHistoryLoading(false);
     }
@@ -204,10 +213,27 @@ export default function ReportScreen() {
               Data bayi untuk akun orang tua tidak ditemukan.
             </Text>
           </View>
+        ) : isReportError ? (
+          <View style={styles.centerBox}>
+            <Text style={styles.errorText}>
+              Laporan gagal dimuat. Silakan coba lagi.
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => {
+                setIsLoading(true);
+                setIsReportError(false);
+                void fetchReport();
+              }}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryButtonText}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </View>
         ) : !report ? (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>
-              Tidak ada data rekam AI untuk tanggal ini.
+              Belum ada data rekam AI untuk tanggal ini.
             </Text>
           </View>
         ) : (
@@ -256,6 +282,23 @@ export default function ReportScreen() {
                   <Text style={styles.historyLoadingText}>
                     Memuat riwayat...
                   </Text>
+                </View>
+              ) : isHistoryError ? (
+                <View style={styles.historyErrorContainer}>
+                  <Text style={styles.historyError}>
+                    Riwayat laporan gagal dimuat. Silakan coba lagi.
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setIsHistoryLoading(true);
+                      setIsHistoryError(false);
+                      void fetchReportHistory();
+                    }}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryButtonText}>Coba Lagi</Text>
+                  </TouchableOpacity>
                 </View>
               ) : reportHistory.length === 0 ? (
                 <Text style={styles.historyEmpty}>
@@ -514,6 +557,15 @@ const styles = StyleSheet.create({
   centerBox: { alignItems: "center", paddingVertical: 80 },
   loadingText: { marginTop: 12, color: "#6B7280" },
   errorText: { marginTop: 12, color: "#6B7280", textAlign: "center" },
+  retryButton: {
+    marginTop: 8,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#E8F7F1",
+  },
+  retryButtonText: { color: "#0F6E56", fontWeight: "700", fontSize: 13 },
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -597,6 +649,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
   },
+  historyErrorContainer: { gap: 8, alignItems: "flex-start" },
+  historyError: { fontSize: 12, color: "#B42318" },
   chartCard: {
     backgroundColor: "#fff",
     borderRadius: 16,

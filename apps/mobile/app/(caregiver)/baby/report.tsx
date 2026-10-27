@@ -41,19 +41,31 @@ export default function NurseBabyReportScreen() {
   const [report, setReport] = useState<DailyReport | null>(null);
   const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [isHistoryError, setIsHistoryError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReportError, setIsReportError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
   );
 
   const fetchReport = useCallback(async () => {
-    if (!babyId) return;
+    if (!babyId) {
+      setReport(null);
+      setIsReportError(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
     try {
       const data = await reportService.getDailyReport(babyId, selectedDate);
-      setReport(data);
-    } catch {
+      // Respons sukses tanpa payload diperlakukan sebagai laporan kosong.
+      setReport(data ?? null);
+      setIsReportError(false);
+    } catch (error) {
+      console.error("[CaregiverReport] Gagal memuat laporan:", error);
       setReport(null);
+      setIsReportError(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -62,16 +74,19 @@ export default function NurseBabyReportScreen() {
   const fetchReportHistory = useCallback(async () => {
     if (!babyId) {
       setReportHistory([]);
+      setIsHistoryError(false);
       setIsHistoryLoading(false);
       return;
     }
 
     try {
       const data = await reportService.getReportList(babyId);
-      setReportHistory(data);
+      setReportHistory(data ?? []);
+      setIsHistoryError(false);
     } catch (error) {
       console.error("[CaregiverReport] Gagal memuat riwayat laporan:", error);
       setReportHistory([]);
+      setIsHistoryError(true);
     } finally {
       setIsHistoryLoading(false);
     }
@@ -169,6 +184,39 @@ export default function NurseBabyReportScreen() {
           <View style={styles.centerBox}>
             <ActivityIndicator color={Colors.secondary} size="large" />
           </View>
+        ) : !babyId ? (
+          <View style={styles.centerBox}>
+            <Icon
+              name="alert-circle-outline"
+              library="ionicons"
+              size={48}
+              color={Colors.danger}
+            />
+            <Text style={styles.errorText}>ID bayi tidak tersedia. Kembali lalu pilih bayi yang ingin dilihat laporannya.</Text>
+          </View>
+        ) : isReportError ? (
+          <View style={styles.centerBox}>
+            <Icon
+              name="cloud-offline-outline"
+              library="ionicons"
+              size={48}
+              color={Colors.danger}
+            />
+            <Text style={styles.errorText}>
+              Laporan gagal dimuat. Silakan coba lagi.
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => {
+                setIsLoading(true);
+                setIsReportError(false);
+                void fetchReport();
+              }}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryButtonText}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </View>
         ) : !report ? (
           <View style={styles.centerBox}>
             <Icon
@@ -178,7 +226,7 @@ export default function NurseBabyReportScreen() {
               color={Colors.textDisabled}
             />
             <Text style={styles.emptyText}>
-              Tidak ada data rekam AI untuk tanggal ini
+              Belum ada data rekam AI untuk tanggal ini.
             </Text>
           </View>
         ) : (
@@ -234,6 +282,23 @@ export default function NurseBabyReportScreen() {
                   <Text style={styles.historyLoadingText}>
                     Memuat riwayat...
                   </Text>
+                </View>
+              ) : isHistoryError ? (
+                <View style={styles.historyErrorContainer}>
+                  <Text style={styles.historyError}>
+                    Riwayat laporan gagal dimuat. Silakan coba lagi.
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setIsHistoryLoading(true);
+                      setIsHistoryError(false);
+                      void fetchReportHistory();
+                    }}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryButtonText}>Coba Lagi</Text>
+                  </TouchableOpacity>
                 </View>
               ) : reportHistory.length === 0 ? (
                 <Text style={styles.historyEmpty}>
@@ -445,6 +510,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.interRegular,
     fontSize: 14,
     color: Colors.textMuted,
+    textAlign: "center",
+  },
+  errorText: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    color: Colors.danger,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 4,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+  },
+  retryButtonText: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 13,
+    color: Colors.secondaryDark,
   },
   summaryRow: { flexDirection: "row", gap: 10 },
   summaryCard: {
@@ -528,6 +613,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.interRegular,
     fontSize: 12,
     color: Colors.textMuted,
+  },
+  historyErrorContainer: { gap: 8, alignItems: "flex-start" },
+  historyError: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 12,
+    color: Colors.danger,
   },
   card: {
     backgroundColor: Colors.white,

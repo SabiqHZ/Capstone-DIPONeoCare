@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   Dimensions,
   RefreshControl,
@@ -25,6 +26,15 @@ import { useAllBabyStatuses } from "../../context/BabyContext";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 2;
+
+type BabyListFilter = "all" | "crying" | "anomaly" | "offline";
+
+const BABY_LIST_FILTERS: { key: BabyListFilter; label: string }[] = [
+  { key: "all", label: "Semua" },
+  { key: "crying", label: "Menangis" },
+  { key: "anomaly", label: "Anomali" },
+  { key: "offline", label: "Offline" },
+];
 
 interface BabyWithStatus extends Baby {
   baby_statuses?: {
@@ -206,6 +216,8 @@ export default function NurseDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<BabyListFilter>("all");
 
   // INJEKSI REALTIME: Untuk Summary Bar
   const realtimeStatuses = useAllBabyStatuses();
@@ -267,6 +279,69 @@ export default function NurseDashboard() {
 
     return { cryingCount: cry, faceAnomalyCount: face, onlineCount: online };
   }, [babies, realtimeStatuses]);
+
+  // Pencarian dan filter hanya mengubah daftar yang terlihat; data sumber tidak diubah.
+  const filteredBabies = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+
+    const matchingBabies = babies.filter((baby) => {
+      const babyName = (baby.name ?? "").toLocaleLowerCase();
+      const bedNumber = String(baby.bed_number ?? "").toLocaleLowerCase();
+      const matchesSearch =
+        !query ||
+        babyName.includes(query) ||
+        bedNumber.includes(query) ||
+        `bed ${bedNumber}`.includes(query);
+
+      if (!matchesSearch) return false;
+      if (activeFilter === "all") return true;
+
+      const rtStatus = realtimeStatuses[baby.id];
+      const isCrying =
+        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false;
+      const faceAnomaly =
+        rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+      const isFaceAnomaly =
+        faceAnomaly != null && faceAnomaly !== "none";
+      const isOnline = rtStatus
+        ? rtStatus.deviceOnline
+        : (baby.devices?.is_online ?? false);
+
+      if (activeFilter === "crying") return Boolean(isCrying);
+      if (activeFilter === "anomaly") return isFaceAnomaly;
+      if (activeFilter === "offline") return !isOnline;
+      return true;
+    });
+
+    // Urutkan bayi yang paling membutuhkan perhatian terlebih dahulu.
+    // Tingkat prioritas: menangis + anomali, menangis, anomali, lalu kondisi lain.
+    // Urutan awal dipertahankan jika tingkat prioritas sama.
+    return matchingBabies
+      .map((baby, originalIndex) => {
+        const rtStatus = realtimeStatuses[baby.id];
+        const isCrying = Boolean(
+          rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
+        );
+        const faceAnomaly =
+          rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+        const hasFaceAnomaly =
+          faceAnomaly != null && faceAnomaly !== "none";
+        const priority = isCrying && hasFaceAnomaly
+          ? 3
+          : isCrying
+            ? 2
+            : hasFaceAnomaly
+              ? 1
+              : 0;
+
+        return { baby, originalIndex, priority };
+      })
+      .sort(
+        (a, b) =>
+          b.priority - a.priority || a.originalIndex - b.originalIndex,
+      )
+      .map(({ baby }) => baby);
+  }, [babies, searchQuery, activeFilter, realtimeStatuses]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -344,6 +419,74 @@ export default function NurseDashboard() {
         </View>
       </View>
 
+      {!isLoading && !error && babies.length > 0 ? (
+        <View style={styles.listControls}>
+          <View style={styles.searchBox}>
+            <Icon
+              name="search-outline"
+              library="ionicons"
+              size={18}
+              color={Colors.textMuted}
+            />
+            <TextInput
+              accessibilityLabel="Cari bayi berdasarkan nama atau nomor tempat tidur"
+              placeholder="Cari nama atau nomor tempat tidur..."
+              placeholderTextColor={Colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              returnKeyType="search"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Hapus pencarian"
+                onPress={() => setSearchQuery("")}
+                hitSlop={8}
+              >
+                <Icon
+                  name="close-circle"
+                  library="ionicons"
+                  size={18}
+                  color={Colors.textMuted}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            {BABY_LIST_FILTERS.map((filter) => {
+              const selected = activeFilter === filter.key;
+              return (
+                <TouchableOpacity
+                  key={filter.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => setActiveFilter(filter.key)}
+                  style={[styles.filterChip, selected && styles.filterChipActive]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selected && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {filter.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.priorityHint}>
+            Urutan otomatis: menangis dan anomali diprioritaskan, lalu menangis, kemudian anomali.
+          </Text>
+        </View>
+      ) : null}
+
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={Colors.secondary} />
@@ -389,7 +532,9 @@ export default function NurseDashboard() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.grid}
+          contentContainerStyle={
+            filteredBabies.length > 0 ? styles.grid : styles.resultsEmptyContainer
+          }
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -400,13 +545,37 @@ export default function NurseDashboard() {
             />
           }
         >
-          {babies.map((baby) => (
-            <BabyCard
-              key={baby.id}
-              baby={baby}
-              onPress={() => router.push(`/(caregiver)/baby/${baby.id}`)}
-            />
-          ))}
+          {filteredBabies.length > 0 ? (
+            filteredBabies.map((baby) => (
+              <BabyCard
+                key={baby.id}
+                baby={baby}
+                onPress={() => router.push(`/(caregiver)/baby/${baby.id}`)}
+              />
+            ))
+          ) : (
+            <View style={styles.filterEmptyBox}>
+              <Icon
+                name="search-outline"
+                library="ionicons"
+                size={36}
+                color={Colors.textDisabled}
+              />
+              <Text style={styles.emptyTitle}>Bayi tidak ditemukan</Text>
+              <Text style={styles.emptyText}>
+                Coba ubah kata pencarian atau pilih filter lain.
+              </Text>
+              <TouchableOpacity
+                style={styles.resetFilterBtn}
+                onPress={() => {
+                  setSearchQuery("");
+                  setActiveFilter("all");
+                }}
+              >
+                <Text style={styles.retryText}>Hapus Pencarian dan Filter</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -539,6 +708,83 @@ const styles = StyleSheet.create({
     height: "80%",
     backgroundColor: Colors.border,
     alignSelf: "center",
+  },
+  listControls: {
+    backgroundColor: Colors.backgroundNurse,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  searchBox: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 10,
+    fontFamily: Fonts.interRegular,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 2,
+  },
+  filterChip: {
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+  filterChipText: {
+    fontFamily: Fonts.interMedium,
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+  },
+  priorityHint: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 11,
+    lineHeight: 16,
+    color: Colors.textMuted,
+    paddingBottom: 2,
+  },
+  resultsEmptyContainer: {
+    flexGrow: 1,
+  },
+  filterEmptyBox: {
+    flex: 1,
+    minHeight: 220,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+    gap: 12,
+  },
+  resetFilterBtn: {
+    backgroundColor: Colors.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 4,
   },
   grid: { flexDirection: "row", flexWrap: "wrap", padding: 16, gap: 16 },
   card: {

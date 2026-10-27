@@ -24,6 +24,7 @@ import {
   useBabyStatusById,
   useActiveAlerts,
 } from "../../../context/BabyContext";
+import React from "react";
 
 interface BabyDetail {
   baby_statuses: any;
@@ -934,7 +935,7 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     width: "100%",
-    height: 220,
+    aspectRatio: 4 / 3,
     backgroundColor: "#111827",
     borderRadius: 16,
     overflow: "hidden",
@@ -950,6 +951,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#111827",
+    transform: [{ rotate: "180deg" }],
   },
   cameraMessageOverlay: {
     position: "absolute",

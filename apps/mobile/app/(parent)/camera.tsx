@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   View,
@@ -19,12 +19,13 @@ import { api } from "../../services/api";
 import { deviceService } from "../../services/device.service";
 import { reportService } from "../../services/report.service";
 import { DailyReport } from "../../types";
+import React from "react";
 
 const { width } = Dimensions.get("window");
 
 export default function CameraScreen() {
   const user = useAuthStore((s) => s.user);
-  const { state } = useBabyContext();
+  const { state, setFocused } = useBabyContext();
 
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
 
@@ -57,6 +58,7 @@ export default function CameraScreen() {
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
 
   const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
+  const lastReportFetchedAtRef = useRef(0);
 
   const babyId = user?.role === "parent" ? user.babyId : null;
 
@@ -227,14 +229,19 @@ export default function CameraScreen() {
   /**
    * Ambil report harian.
    */
-  const fetchDailyReport = async () => {
+  const fetchDailyReport = useCallback(async () => {
     if (!babyId) {
       setDailyReport(null);
       return;
     }
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const today = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
 
       const report = await reportService.getDailyReport(babyId, today);
 
@@ -247,7 +254,16 @@ export default function CameraScreen() {
 
       setDailyReport(null);
     }
-  };
+  }, [babyId]);
+
+  /**
+   * Load the latest AI status when the camera screen opens.
+   */
+  useEffect(() => {
+    if (babyId) {
+      void setFocused(babyId);
+    }
+  }, [babyId, setFocused]);
 
   /**
    * Ketika baby berubah, ambil device terbaru.
@@ -257,11 +273,18 @@ export default function CameraScreen() {
   }, [babyId]);
 
   /**
-   * Ketika baby berubah, ambil report terbaru.
+   * Refresh activity totals after each finalized AI status update.
    */
   useEffect(() => {
-    void fetchDailyReport();
-  }, [babyId]);
+    const timeSinceLastFetch = Date.now() - lastReportFetchedAtRef.current;
+    const delay = Math.max(0, 5_000 - timeSinceLastFetch);
+    const timer = setTimeout(() => {
+      lastReportFetchedAtRef.current = Date.now();
+      void fetchDailyReport();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [fetchDailyReport, focusedStatus?.lastUpdated]);
 
   /**
    * Polling frame terbaru dengan double buffering mechanism.
@@ -704,6 +727,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
+    transform: [{ rotate: "180deg" }],
   },
 
   centerBox: {

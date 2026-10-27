@@ -75,7 +75,7 @@ function buildForm(
   // IMPORTANT:
   // FormData harus dibuat ulang setiap retry karena
   // stream request sebelumnya sudah digunakan.
-  form.append(kind === "vision" ? "file" : "audio", payload.file.buffer, {
+  form.append("file", payload.file.buffer, {
     filename: payload.file.originalname,
     contentType: payload.file.mimetype,
   });

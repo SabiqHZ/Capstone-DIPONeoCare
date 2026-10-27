@@ -42,6 +42,7 @@ export default function ParentDashboard() {
 
   const [babyProfile, setBabyProfile] = useState<BabyProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   const [faceAnomalyDismissed, setFaceAnomalyDismissed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -54,13 +55,27 @@ export default function ParentDashboard() {
   const logout = useAuthStore((s) => s.logout);
 
   const fetchBabyProfile = useCallback(async () => {
-    if (!babyId) return;
+    if (!babyId) {
+      setBabyProfile(null);
+      setProfileError(true);
+      setIsProfileLoading(false);
+      return;
+    }
+
     try {
       setIsProfileLoading(true);
+      setProfileError(false);
       const res = await babyService.getBabyById(babyId);
+      if (!res) {
+        setBabyProfile(null);
+        setProfileError(true);
+        return;
+      }
       setBabyProfile(res as BabyProfile);
     } catch (err) {
       console.error("[Dashboard] Gagal memuat profil identitas bayi:", err);
+      setBabyProfile(null);
+      setProfileError(true);
     } finally {
       setIsProfileLoading(false);
     }
@@ -176,10 +191,26 @@ export default function ParentDashboard() {
         />
 
         {/* Konten Utama: Data Identitas Pasien (4 di Awal + Toggle) */}
-        {isProfileLoading || !babyProfile ? (
+        {isProfileLoading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#1D9E75" />
             <Text style={styles.loadingText}>Memuat identitas pasien...</Text>
+          </View>
+        ) : profileError || !babyProfile ? (
+          <View style={styles.loadingBox}>
+            <Text style={styles.profileErrorTitle}>Identitas bayi belum dapat dimuat</Text>
+            <Text style={styles.loadingText}>
+              Periksa koneksi aplikasi, lalu coba muat ulang data identitas.
+            </Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={fetchBabyProfile}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Coba muat ulang identitas bayi"
+            >
+              <Text style={styles.retryButtonText}>Coba Lagi</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.identityCard}>
@@ -342,7 +373,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
-  loadingText: { fontSize: 13, color: "#6B7280" },
+  loadingText: { fontSize: 13, color: "#6B7280", textAlign: "center" },
+  profileErrorTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#374151",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 4,
+    backgroundColor: "#1D9E75",
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  retryButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
 
   // Identity Card Style
   identityCard: {
