@@ -9,6 +9,8 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  ScrollView,
+  RefreshControl,
 } from "react-native";
 
 import Svg, { Path } from "react-native-svg";
@@ -55,6 +57,7 @@ export default function CameraScreen() {
 
   const [isLoadingDevice, setIsLoadingDevice] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -169,7 +172,7 @@ export default function CameraScreen() {
   /**
    * Ambil device + stream URL dari backend.
    */
-  const fetchStreamUrl = async () => {
+  const fetchStreamUrl = useCallback(async (preserveCurrent = false) => {
     if (!babyId) {
       setStreamUrl(null);
       resetCameraFrames();
@@ -179,8 +182,10 @@ export default function CameraScreen() {
       return;
     }
 
-    setIsLoadingDevice(true);
-    setHasError(false);
+    if (!preserveCurrent) {
+      setIsLoadingDevice(true);
+      setHasError(false);
+    }
 
     try {
       console.log("[ParentCamera] Mulai mengambil device...");
@@ -220,14 +225,18 @@ export default function CameraScreen() {
     } catch (error) {
       console.error("[ParentCamera] fetchStreamUrl ERROR:", error);
 
-      setStreamUrl(null);
-      resetCameraFrames();
-      setApiDeviceOnline(null);
-      setHasError(true);
+      if (!preserveCurrent) {
+        setStreamUrl(null);
+        resetCameraFrames();
+        setApiDeviceOnline(null);
+        setHasError(true);
+      }
     } finally {
-      setIsLoadingDevice(false);
+      if (!preserveCurrent) {
+        setIsLoadingDevice(false);
+      }
     }
-  };
+  }, [babyId]);
 
   /**
    * Ambil report harian.
@@ -259,6 +268,16 @@ export default function CameraScreen() {
     }
   }, [babyId]);
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([fetchStreamUrl(true), fetchDailyReport()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchDailyReport, fetchStreamUrl]);
+
   /**
    * Load the latest AI status when the camera screen opens.
    */
@@ -273,7 +292,7 @@ export default function CameraScreen() {
    */
   useEffect(() => {
     void fetchStreamUrl();
-  }, [babyId]);
+  }, [fetchStreamUrl]);
 
   /**
    * Refresh activity totals after each finalized AI status update.
@@ -397,6 +416,20 @@ export default function CameraScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#fff"
+            colors={["#1D9E75"]}
+            progressBackgroundColor="#161616"
+          />
+        }
+      >
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.title}>Kamera Langsung</Text>
@@ -668,6 +701,7 @@ export default function CameraScreen() {
           </Text>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -676,6 +710,14 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#0d0d0d",
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
   },
 
   header: {

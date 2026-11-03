@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
@@ -104,8 +105,11 @@ export default function DeviceConfigScreen() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const editedFields = useRef(new Set<keyof DeviceConfig>());
 
   const update = (key: keyof DeviceConfig, delta: number, step: number) => {
+    editedFields.current.add(key);
     setConfig((c) => ({
       ...c,
       [key]: Math.round((Number(c[key]) + delta * step) * 100) / 100,
@@ -136,14 +140,19 @@ export default function DeviceConfigScreen() {
 
       const data = response.data.data;
 
-      setConfig({
+      setConfig((current) => ({
         deviceId: data.id,
-        cryingMinDurationSec:
-          data.crying_min_duration_sec ?? DEFAULT_CONFIG.cryingMinDurationSec,
-        notificationCooldownSec:
-          data.notification_cooldown_sec ??
-          DEFAULT_CONFIG.notificationCooldownSec,
-      });
+        cryingMinDurationSec: editedFields.current.has("cryingMinDurationSec")
+          ? current.cryingMinDurationSec
+          : data.crying_min_duration_sec ??
+            DEFAULT_CONFIG.cryingMinDurationSec,
+        notificationCooldownSec: editedFields.current.has(
+          "notificationCooldownSec",
+        )
+          ? current.notificationCooldownSec
+          : data.notification_cooldown_sec ??
+            DEFAULT_CONFIG.notificationCooldownSec,
+      }));
     } catch (error: any) {
       console.error(
         "[DeviceConfig] Gagal mengambil konfigurasi:",
@@ -163,6 +172,15 @@ export default function DeviceConfigScreen() {
     void loadConfig();
   }, [deviceId]);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadConfig();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleReset = () => {
     Alert.alert(
       "Reset Konfigurasi",
@@ -171,11 +189,14 @@ export default function DeviceConfigScreen() {
         { text: "Batal", style: "cancel" },
         {
           text: "Reset",
-          onPress: () =>
+          onPress: () => {
+            editedFields.current.add("cryingMinDurationSec");
+            editedFields.current.add("notificationCooldownSec");
             setConfig({
               ...DEFAULT_CONFIG,
               deviceId: deviceId ?? DEFAULT_CONFIG.deviceId,
-            }),
+            });
+          },
           style: "destructive",
         },
       ],
@@ -223,6 +244,14 @@ export default function DeviceConfigScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.secondary]}
+            tintColor={Colors.secondary}
+          />
+        }
       >
         {/* Deteksi Tangisan */}
         <View style={styles.section}>

@@ -12,6 +12,7 @@ import {
   Modal,
   FlatList,
   Platform,
+  RefreshControl,
 } from "react-native";
 import DateTimePicker, {
   DateTimePickerAndroid,
@@ -84,11 +85,20 @@ const dateInputToApiDate = (value: string): string => {
 
   return `${year}-${month}-${day}`;
 };
+
+const BED_LETTERS = Array.from({ length: 26 }, (_, index) =>
+  String.fromCharCode(65 + index),
+);
+const BED_NUMBERS = Array.from({ length: 100 }, (_, index) =>
+  String(index).padStart(2, "0"),
+);
+const BED_WHEEL_ITEM_HEIGHT = 28;
+
 export default function RegisterBabyScreen() {
   const router = useRouter();
   const [form, setForm] = useState<BabyForm>({
     name: "",
-    bedNumber: "",
+    bedNumber: "A-00",
     dateOfBirth: "",
     parentName: "",
     deviceId: "",
@@ -105,6 +115,7 @@ export default function RegisterBabyScreen() {
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(true);
   const [isDeviceModalVisible, setIsDeviceModalVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch daftar kamera yang nganggur saat halaman dimuat
   useEffect(() => {
@@ -126,8 +137,29 @@ export default function RegisterBabyScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchAvailableDevices();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const update = (key: keyof BabyForm, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
+
+  const updateBedLetter = (letter: string) =>
+    setForm((current) => ({
+      ...current,
+      bedNumber: `${letter}-${current.bedNumber.slice(-2) || "00"}`,
+    }));
+
+  const updateBedDigits = (number: string) =>
+    setForm((current) => ({
+      ...current,
+      bedNumber: `${current.bedNumber[0] || "A"}-${number}`,
+    }));
 
   const openDatePicker = () => {
     const initialDate = parseDateInput(form.dateOfBirth) ?? new Date();
@@ -163,7 +195,10 @@ export default function RegisterBabyScreen() {
 
   const handleSubmit = async () => {
     if (!isValid) {
-      Alert.alert("Lengkapi Data", "Semua data termasuk pilihan kamera wajib diisi.");
+      Alert.alert(
+        "Lengkapi Data",
+        "Semua data termasuk pilihan kamera wajib diisi.",
+      );
       return;
     }
 
@@ -271,7 +306,7 @@ export default function RegisterBabyScreen() {
               setRegisteredBaby(null);
               setForm({
                 name: "",
-                bedNumber: "",
+                bedNumber: "A-00",
                 dateOfBirth: "",
                 parentName: "",
                 deviceId: "",
@@ -322,6 +357,14 @@ export default function RegisterBabyScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.secondary]}
+            tintColor={Colors.secondary}
+          />
+        }
       >
         <View style={styles.infoBox}>
           <Icon
@@ -346,14 +389,23 @@ export default function RegisterBabyScreen() {
             iconLibrary="material"
           />
           <View style={styles.divider} />
-          <Field
-            label="Nomor Tempat Tidur"
-            placeholder="contoh: B-03"
-            value={form.bedNumber}
-            onChangeText={(v) => update("bedNumber", v)}
-            icon="bed"
-            iconLibrary="ionicons"
-          />
+          <View style={fieldStyles.wrapper}>
+            <Text style={fieldStyles.label}>Nomor Tempat Tidur</Text>
+            <View style={styles.bedPickerRow}>
+              <BedWheelColumn
+                label="Huruf"
+                values={BED_LETTERS}
+                selectedValue={form.bedNumber[0] || "A"}
+                onSelect={updateBedLetter}
+              />
+              <BedWheelColumn
+                label="Nomor"
+                values={BED_NUMBERS}
+                selectedValue={form.bedNumber.slice(-2) || "00"}
+                onSelect={updateBedDigits}
+              />
+            </View>
+          </View>
           <View style={styles.divider} />
           <View style={fieldStyles.wrapper}>
             <Text style={fieldStyles.label}>Tanggal Lahir</Text>
@@ -449,7 +501,9 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.white}
               />
-              <Text style={styles.submitBtnText}>Simpan & Hubungkan Kamera</Text>
+              <Text style={styles.submitBtnText}>
+                Simpan & Hubungkan Kamera
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -565,6 +619,69 @@ interface FieldProps {
   iconLibrary?: "ionicons" | "material" | "feather";
   keyboardType?: "default" | "numeric";
   maxLength?: number;
+}
+
+interface BedWheelColumnProps {
+  label: string;
+  values: string[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+}
+
+function BedWheelColumn({
+  label,
+  values,
+  selectedValue,
+  onSelect,
+}: BedWheelColumnProps) {
+  const selectedIndex = Math.max(0, values.indexOf(selectedValue));
+
+  return (
+    <View style={styles.bedPickerColumn}>
+      <Text style={styles.bedPickerLabel}>{label}</Text>
+      <FlatList
+        data={values}
+        initialScrollIndex={selectedIndex}
+        getItemLayout={(_data, index) => ({
+          length: BED_WHEEL_ITEM_HEIGHT,
+          offset: BED_WHEEL_ITEM_HEIGHT * index,
+          index,
+        })}
+        keyExtractor={(item) => item}
+        nestedScrollEnabled
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(
+            event.nativeEvent.contentOffset.y / BED_WHEEL_ITEM_HEIGHT,
+          );
+          const value = values[index];
+          if (value) onSelect(value);
+        }}
+        renderItem={({ item }) => (
+          <View
+            style={[
+              styles.bedPickerItem,
+              item === selectedValue && styles.bedPickerItemSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.bedPickerItemText,
+                item === selectedValue && styles.bedPickerItemTextSelected,
+              ]}
+            >
+              {item}
+            </Text>
+          </View>
+        )}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={BED_WHEEL_ITEM_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        contentContainerStyle={styles.bedPickerListContent}
+        style={styles.bedPickerList}
+      />
+    </View>
+  );
 }
 
 function Field({
@@ -689,6 +806,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  bedPickerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+  },
+  bedPickerColumn: {
+    width: 76,
+  },
+  bedPickerLabel: {
+    fontFamily: Fonts.interMedium,
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  bedPickerList: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radii.control,
+    backgroundColor: Colors.backgroundNurse,
+  },
+  bedPickerListContent: {
+    paddingVertical: 36,
+  },
+  bedPickerItem: {
+    height: BED_WHEEL_ITEM_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bedPickerItemSelected: {
+    backgroundColor: Colors.secondaryLight,
+  },
+  bedPickerItemText: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  bedPickerItemTextSelected: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 13,
+    color: Colors.secondaryDark,
   },
   divider: { height: 1, backgroundColor: Colors.border },
   submitBtn: {

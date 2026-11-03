@@ -13,14 +13,17 @@ interface OtpInputProps {
   onComplete: (code: string) => void;
   disabled?: boolean;
   error?: boolean;
+  accentColor?: string;
 }
 
 export function OtpInput({
   onComplete,
   disabled = false,
   error = false,
+  accentColor = '#1D9E75',
 }: OtpInputProps) {
   const [values, setValues] = useState<string[]>(Array(CODE_LENGTH).fill(''));
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputs = useRef<(TextInput | null)[]>([]);
 
   const handleChange = useCallback(
@@ -78,6 +81,12 @@ export function OtpInput({
               ref={(r) => { inputs.current[i] = r; }}
               style={[
                 styles.box,
+                {
+                  borderColor:
+                    error ? '#E24B4A' : values[i] || focusedIndex === i
+                      ? accentColor
+                      : '#D3D1C7',
+                },
                 values[i] ? styles.boxFilled : null,
                 error ? styles.boxError : null,
                 disabled ? styles.boxDisabled : null,
@@ -85,12 +94,19 @@ export function OtpInput({
               value={values[i]}
               onChangeText={(t) => handleChange(t, i)}
               onKeyPress={(e) => handleKeyPress(e, i)}
+              onFocus={() => setFocusedIndex(i)}
+              onBlur={() =>
+                setFocusedIndex((current) => (current === i ? null : current))
+              }
               maxLength={CODE_LENGTH}
               autoCapitalize="characters"
               autoCorrect={false}
               selectTextOnFocus
               editable={!disabled}
               autoFocus={i === 0}
+              underlineColorAndroid="transparent"
+              accessibilityLabel={`Karakter ${i + 1} dari ${CODE_LENGTH}`}
+              keyboardType="default"
             />
           </React.Fragment>
         ))}
@@ -104,10 +120,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    width: '100%',
   },
   box: {
-    width: 30,
-    height: 45,
+    flex: 1,
+    minWidth: 0,
+    height: 52,
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#D3D1C7',
@@ -115,11 +133,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#2C2C2A',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   boxFilled: {
     borderColor: '#1D9E75',
-    backgroundColor: '#E1F5EE',
+    backgroundColor: '#E8F8F3',
     color: '#085041',
   },
   boxError: {
@@ -130,7 +148,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   divider: {
-    width: 10,
+    width: 8,
     height: 2,
     backgroundColor: '#D1D5DB',
     borderRadius: 1,

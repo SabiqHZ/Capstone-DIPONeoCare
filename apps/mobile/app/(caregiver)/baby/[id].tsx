@@ -10,7 +10,10 @@ import {
   RefreshControl,
   Alert,
   Image,
+  Modal,
+  Pressable,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
@@ -73,6 +76,9 @@ export default function BabyDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDischargeConfirmVisible, setIsDischargeConfirmVisible] =
+    useState(false);
+  const [isDischarging, setIsDischarging] = useState(false);
 
   const realtimeStatus = useBabyStatusById(id ?? "");
   const allAlerts = useActiveAlerts();
@@ -85,7 +91,9 @@ export default function BabyDetailScreen() {
       const data = await babyService.getBabyById(id);
       setBaby(data as BabyDetail);
     } catch {
-      setError("Tidak dapat memuat informasi bayi. Periksa koneksi lalu coba lagi.");
+      setError(
+        "Tidak dapat memuat informasi bayi. Periksa koneksi lalu coba lagi.",
+      );
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -243,48 +251,35 @@ export default function BabyDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      "Keluarkan Pasien",
-      `Yakin ingin mengeluarkan ${baby?.name} dari sistem? Kamera yang terhubung akan dilepas dari bayi ini.`,
-      [
-        {
-          text: "Batal",
-          style: "cancel",
-        },
-        {
-          text: "Keluarkan",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await babyService.dischargeBaby(id);
+    setIsDischargeConfirmVisible(true);
+  };
 
-              Alert.alert(
-                "Sukses",
-                "Pasien berhasil dikeluarkan dari sistem.",
-                [
-                  {
-                    text: "Baik",
-                    onPress: () => {
-                      router.replace("/(caregiver)/dashboard");
-                    },
-                  },
-                ],
-              );
-            } catch (err: any) {
-              console.error(
-                "[BabyDetail] Gagal mengeluarkan pasien:",
-                err.response?.data || err,
-              );
+  const confirmDischarge = async () => {
+    if (!id) return;
 
-              Alert.alert(
-                "Gagal",
-                "Tidak dapat mengeluarkan bayi saat ini. Coba lagi.",
-              );
-            }
-          },
+    setIsDischarging(true);
+    try {
+      await babyService.dischargeBaby(id);
+      setIsDischargeConfirmVisible(false);
+      Alert.alert("Sukses", "Pasien berhasil dikeluarkan dari sistem.", [
+        {
+          text: "Baik",
+          onPress: () => router.replace("/(caregiver)/dashboard"),
         },
-      ],
-    );
+      ]);
+    } catch (err: any) {
+      console.error(
+        "[BabyDetail] Gagal mengeluarkan pasien:",
+        err.response?.data || err,
+      );
+      setIsDischargeConfirmVisible(false);
+      Alert.alert(
+        "Gagal",
+        "Tidak dapat mengeluarkan bayi saat ini. Coba lagi.",
+      );
+    } finally {
+      setIsDischarging(false);
+    }
   };
 
   if (isLoading) {
@@ -571,7 +566,7 @@ export default function BabyDetailScreen() {
 
               {hasFrame ? (
                 <View style={styles.liveBadge}>
-                  <Text style={styles.liveText}>🔴 LANGSUNG</Text>
+                  <Text style={styles.liveText}> LANGSUNG</Text>
                 </View>
               ) : null}
             </View>
@@ -739,6 +734,76 @@ export default function BabyDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <Modal
+        visible={isDischargeConfirmVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!isDischarging) setIsDischargeConfirmVisible(false);
+        }}
+      >
+        <View style={styles.confirmOverlay}>
+          <BlurView
+            intensity={45}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.confirmScrim]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tutup konfirmasi"
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (!isDischarging) setIsDischargeConfirmVisible(false);
+            }}
+          />
+          <View
+            style={styles.confirmCard}
+            accessibilityViewIsModal
+            accessibilityLabel="Konfirmasi keluarkan pasien"
+          >
+            <View style={styles.confirmIcon}>
+              <Icon
+                name="log-out-outline"
+                library="ionicons"
+                size={28}
+                color={Colors.critical}
+              />
+            </View>
+            <Text style={styles.confirmTitle}>Keluarkan Pasien</Text>
+            <Text style={styles.confirmMessage}>
+              Yakin ingin mengeluarkan {baby?.name} dari sistem? Kamera yang
+              terhubung akan dilepas dari bayi ini.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancelButton}
+                onPress={() => setIsDischargeConfirmVisible(false)}
+                disabled={isDischarging}
+                accessibilityRole="button"
+              >
+                <Text style={styles.confirmCancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmDischargeButton}
+                onPress={() => void confirmDischarge()}
+                disabled={isDischarging}
+                accessibilityRole="button"
+              >
+                {isDischarging ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.confirmDischargeText}>Keluarkan</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -819,6 +884,83 @@ const infoStyles = StyleSheet.create({
 // ── Styles ────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.backgroundNurse },
+  confirmOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  confirmScrim: {
+    backgroundColor: "rgba(15, 23, 42, 0.28)",
+  },
+  confirmCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: Colors.white,
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  confirmIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.criticalLight,
+  },
+  confirmTitle: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 18,
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  confirmMessage: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  confirmActions: {
+    flexDirection: "row",
+    width: "100%",
+    gap: 12,
+    marginTop: 4,
+  },
+  confirmCancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCancelText: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  confirmDischargeButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.critical,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmDischargeText: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    color: Colors.white,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -829,7 +971,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  backBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     ...Typography.h2,
     color: Colors.secondaryDark,
@@ -837,7 +984,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginHorizontal: 8,
   },
-  configBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  configBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
   centerBox: {
     flex: 1,

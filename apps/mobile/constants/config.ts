@@ -1,5 +1,4 @@
-const DEFAULT_REMOTE_API_URL =
-  "https://capstone-diponeocare-production.up.railway.app";
+const DEFAULT_REMOTE_API_URL = "https://diponeocare-backend.fly.dev";
 
 const DEV_IP = process.env.EXPO_PUBLIC_DEV_IP?.trim() || "";
 

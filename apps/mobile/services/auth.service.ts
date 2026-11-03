@@ -1,9 +1,9 @@
-import axios from 'axios';
+import axios from "axios";
 import { api } from "./api";
 import { AuthUser } from "../types";
 
 interface NurseLoginResponse {
-  role: 'nurse';
+  role: "nurse";
   id: string;
   name: string;
   unitId: string;
@@ -14,19 +14,29 @@ function getAuthErrorMessage(error: unknown, fallback: string): string {
   if (!axios.isAxiosError(error)) return fallback;
 
   if (!error.response) {
-    return 'Tidak dapat terhubung. Periksa koneksi Wi-Fi ponsel Anda, lalu coba lagi.';
+    return "Tidak dapat terhubung. Periksa koneksi Wi-Fi ponsel Anda, lalu coba lagi.";
   }
 
-      return fallback;
+  return fallback;
 }
 
 export const authService = {
+  getCaregiverProfile: async () => {
+    const res = await api.get('/auth/nurse/profile');
+    return res.data.data as { id: string; username: string; name: string; unitId: string };
+  },
+
+  changeCaregiverPassword: async (currentPassword: string, newPassword: string) => {
+    const res = await api.patch('/auth/nurse/password', { currentPassword, newPassword });
+    return res.data as { success: boolean; message?: string };
+  },
+
   loginWithCode: async (code: string): Promise<AuthUser> => {
     try {
       const res = await api.post("/auth/parent", { uniqueCode: code });
       return res.data.data as AuthUser;
     } catch (error: unknown) {
-      throw new Error(getAuthErrorMessage(error, 'Kode tidak valid'));
+      throw new Error(getAuthErrorMessage(error, "Kode tidak valid"));
     }
   },
 
@@ -44,11 +54,11 @@ export const authService = {
         name: nurse.name,
         unitId: nurse.unitId,
         token: nurse.token,
-        role: 'caregiver',
+        role: "caregiver",
       };
     } catch (error: unknown) {
       throw new Error(
-        getAuthErrorMessage(error, 'Nama pengguna atau kata sandi salah.'),
+        getAuthErrorMessage(error, "Nama pengguna atau kata sandi salah."),
       );
     }
   },

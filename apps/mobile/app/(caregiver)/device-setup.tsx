@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
@@ -26,7 +27,22 @@ export default function DeviceSetupScreen() {
   const [ssid, setSsid] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetch(ESP32_SETUP_URL);
+    } catch {
+      Alert.alert(
+        "Koneksi Gagal",
+        "Tidak bisa menghubungi kamera. Pastikan ponsel Anda terhubung ke jaringan Wi-Fi kamera.",
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleSendCredentials = async () => {
     if (!ssid.trim()) {
@@ -101,6 +117,14 @@ export default function DeviceSetupScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.secondary]}
+            tintColor={Colors.secondary}
+          />
+        }
       >
         {/* Step 1: Instruksi Koneksi Fisik */}
         <View style={[styles.stepCard, step === 2 && styles.stepCardDimmed]}>

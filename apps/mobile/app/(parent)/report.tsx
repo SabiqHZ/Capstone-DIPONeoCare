@@ -133,6 +133,18 @@ export default function ReportScreen() {
     return calculateSegments(sleep, awake, crying);
   }, [report]);
 
+  const dailyInsight = useMemo(() => {
+    if (!report) return null;
+    const totals = [
+      { label: "Tidur", value: report.totalSleepMinutes },
+      { label: "Bangun", value: report.totalAwakeMinutes },
+      { label: "Menangis", value: report.totalCryingMinutes },
+    ];
+    const top = totals.reduce((best, item) => item.value > best.value ? item : best);
+    if (top.value <= 0) return "Belum ada aktivitas yang tercatat untuk hari ini.";
+    return `${top.label} menjadi aktivitas terbanyak hari ini · ${formatDuration(top.value)} tercatat.`;
+  }, [report]);
+
   const formatDuration = (minutes: number) => {
     const h = Math.floor(minutes / 60);
     const m = Math.round(minutes % 60);
@@ -280,6 +292,13 @@ export default function ReportScreen() {
               </View>
             </View>
 
+            {dailyInsight ? (
+              <View style={styles.insightCard}>
+                <Text style={styles.insightLabel}>Ringkasan</Text>
+                <Text style={styles.insightText}>{dailyInsight}</Text>
+              </View>
+            ) : null}
+
             <View style={styles.historyCard}>
               <View style={styles.historyHeader}>
                 <Text style={styles.historyTitle}>Riwayat Laporan</Text>
@@ -350,31 +369,8 @@ export default function ReportScreen() {
                           )}
                         </Text>
 
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Tidur {Math.round(item.total_sleep_minutes)}m
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Bangun {Math.round(item.total_awake_minutes)}m
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Menangis {item.total_crying_events}x
+                        <Text style={[styles.historyMeta, isSelected && styles.historyMetaSelected]}>
+                          Tidur {formatDuration(item.total_sleep_minutes)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -606,6 +602,14 @@ const styles = StyleSheet.create({
     gap: 12,
     elevation: 1,
   },
+  insightCard: {
+    backgroundColor: Colors.successLight,
+    borderRadius: Radii.card,
+    padding: Spacing.cardPadding,
+    gap: Spacing.xs,
+  },
+  insightLabel: { ...Typography.captionStrong, color: Colors.successDark },
+  insightText: { ...Typography.body, color: Colors.textPrimary, lineHeight: 21 },
   historyHeader: {
     gap: 3,
   },

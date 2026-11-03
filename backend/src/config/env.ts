@@ -9,7 +9,7 @@ const defaultAllowedOrigins = [
   "http://192.168.0.7:8081",
   "exp://10.0.2.2:8081",
   "exp://192.168.0.7:8081",
-  "https://capstone-diponeocare-production.up.railway.app",
+  "https://diponeocare-backend.fly.dev",
 ];
 
 export const env = {

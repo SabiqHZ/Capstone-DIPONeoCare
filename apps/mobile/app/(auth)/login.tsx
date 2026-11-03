@@ -1,23 +1,56 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useState } from "react";
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
-import { useRouter } from 'expo-router';
-import Svg, { Path, Circle, Line } from 'react-native-svg';
-import { useAuthStore } from '../../stores/auth.store';
-import { authService } from '../../services/auth.service';
-import { Typography } from '../../constants/fonts';
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  Image,
+} from "react-native";
+import { useRouter } from "expo-router";
+import Svg, {
+  Path,
+  Circle,
+  Line,
+} from "react-native-svg";
+import { useAuthStore } from "../../stores/auth.store";
+import { authService } from "../../services/auth.service";
+import { Typography } from "../../constants/fonts";
+import { Colors } from "../../constants/colors";
 
 // --- Komponen SVG ---
 const EyeIcon = ({ color = "#9CA3AF", size = 22 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <Circle cx="12" cy="12" r="3" />
   </Svg>
 );
 
 const EyeOffIcon = ({ color = "#9CA3AF", size = 22 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <Svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
     <Line x1="1" y1="1" x2="23" y2="23" />
   </Svg>
@@ -27,23 +60,26 @@ const EyeOffIcon = ({ color = "#9CA3AF", size = 22 }) => (
 export default function LoginScreen() {
   const router = useRouter();
   const { setUser } = useAuthStore();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Lengkapi Data', 'Nama pengguna dan kata sandi wajib diisi.');
+      Alert.alert("Lengkapi Data", "Nama pengguna dan kata sandi wajib diisi.");
       return;
     }
     setIsLoading(true);
     try {
       const user = await authService.loginCaregiver(username.trim(), password);
       await setUser(user);
-      router.replace('/(caregiver)/dashboard');
+      router.replace("/(caregiver)/dashboard");
     } catch (err: any) {
-      Alert.alert('Gagal masuk', err.message || 'Nama pengguna atau kata sandi salah.');
+      Alert.alert(
+        "Gagal masuk",
+        err.message || "Nama pengguna atau kata sandi salah.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -53,33 +89,33 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.inner}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>← Kembali</Text>
-          </TouchableOpacity>
-
           <View style={styles.header}>
-            <View style={styles.logoCircle}>
-              <Image 
-                source={require('../../assets/icon.png')} 
-                style={styles.logoImage} 
+            <View pointerEvents="none" style={styles.gridPattern} />
+            <View pointerEvents="none" style={styles.dotPattern} />
+            <View style={styles.logoGlow}>
+              <Image
+                source={require("../../assets/icon.png")}
+                style={styles.logoImage}
                 resizeMode="contain"
               />
             </View>
             <Text style={styles.title}>Masuk Pengasuh</Text>
-            <Text style={styles.subtitle}>Smart Vision Daycare</Text>
+            <Text style={styles.subtitle}>
+              Masuk untuk memantau bayi dan mengelola aktivitas pengasuhan.
+            </Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.field}>
-              <Text style={styles.label}>Nama pengguna</Text>
+              <Text style={styles.label}>Nama Pengasuh</Text>
               <TextInput
                 style={styles.input}
                 value={username}
                 onChangeText={setUsername}
-                placeholder="Masukkan nama pengguna"
+                placeholder="Masukkan nama Pengasuh"
                 placeholderTextColor="#9CA3AF"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -105,8 +141,14 @@ export default function LoginScreen() {
                   onPress={() => setShowPass(!showPass)}
                   activeOpacity={0.7}
                   accessibilityRole="button"
-                  accessibilityLabel={showPass ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                  accessibilityHint={showPass ? "Menyamarkan kata sandi di kolom" : "Menampilkan kata sandi di kolom"}
+                  accessibilityLabel={
+                    showPass ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"
+                  }
+                  accessibilityHint={
+                    showPass
+                      ? "Menyamarkan kata sandi di kolom"
+                      : "Menampilkan kata sandi di kolom"
+                  }
                 >
                   {showPass ? <EyeOffIcon /> : <EyeIcon />}
                 </TouchableOpacity>
@@ -126,6 +168,14 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Bukan Pengasuh? Kembali"
+          >
+            <Text style={styles.backText}>Bukan Pengasuh?</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -133,43 +183,129 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#EFF6FF' },
+  safe: { flex: 1, backgroundColor: "#F7F8FA" },
   flex: { flex: 1 },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 24 },
-  backBtn: { position: 'absolute', top: 16, left: 24, zIndex: 10, padding: 8 },
-  backText: { fontSize: 14, color: '#185FA5', fontWeight: '600' },
-  header: { alignItems: 'center', gap: 8 },
-  logoCircle: {
-    width: 85, height: 85, borderRadius: 50,
-    backgroundColor: '#378ADD',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 4,
-    overflow: 'hidden',
+  inner: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 48,
+    justifyContent: "center",
   },
-  logoImage: { width: 85, height: 85 },
-  title: { ...Typography.h1, color: '#0C447C', letterSpacing: -0.5 },
-  subtitle: { ...Typography.body, color: '#185FA5' },
+  backBtn: {
+    alignSelf: "center",
+    marginTop: 20,
+    justifyContent: "center",
+    paddingVertical: 8,
+  },
+  backText: {
+    ...Typography.bodyStrong,
+    color: Colors.secondaryDark,
+    textAlign: "center",
+  },
+  header: {
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.secondary,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "49%",
+    paddingTop: 76,
+    paddingHorizontal: 28,
+    overflow: "hidden",
+  },
+  gridPattern: {
+    ...StyleSheet.absoluteFill,
+    opacity: 0.1,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
+  },
+  dotPattern: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: 24,
+    right: -70,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  logoGlow: {
+    width: 100,
+    height: 100,
+    marginTop: 178,
+    marginBottom: 4,
+    borderRadius: 50,
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  logoImage: { width: 100, height: 100 },
+  title: {
+    ...Typography.display,
+    fontSize: 30,
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+    textAlign: "center",
+    maxWidth: 300,
+    marginTop: 10,
+  },
+  subtitle: { ...Typography.body, color: "#EAF3FF", textAlign: "center" },
   card: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 28, gap: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
+    shadowColor: Colors.secondaryDark,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 8,
+    marginTop: 104,
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
   },
   field: { gap: 8 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  label: { ...Typography.captionStrong, color: "#374151" },
   input: {
-    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 13, paddingRight: 45, 
-    fontSize: 15, color: '#111827', backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: "#DDE3EB",
+    borderRadius: 12,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingRight: 50,
+    ...Typography.body,
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
   },
-  eyeBtn: { 
-    position: 'absolute', 
-    right: 14, 
+  eyeBtn: {
+    position: "absolute",
+    right: 14,
     top: 0,
     width: 44,
     height: 48,
-    alignItems: 'center',
-    justifyContent: 'center'
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btn: { backgroundColor: '#378ADD', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
-  btnDisabled: { backgroundColor: '#B5D4F4' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  btn: {
+    backgroundColor: Colors.secondary,
+    borderRadius: 12,
+    minHeight: 50,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  btnDisabled: { backgroundColor: "#B5D4F4" },
+  btnText: { ...Typography.bodyStrong, color: "#fff" },
 });

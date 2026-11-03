@@ -5,6 +5,38 @@ import { env } from '../config/env';
 import { JwtPayload } from '../types';
 
 export const authService = {
+  async getNurseProfile(nurseId: string) {
+    const { data: nurse, error } = await supabaseAdmin
+      .from('nurses')
+      .select('id, username, name, unit_id')
+      .eq('id', nurseId)
+      .single();
+
+    if (error || !nurse) throw new Error('Profil pengasuh tidak ditemukan');
+    return { id: nurse.id, username: nurse.username, name: nurse.name, unitId: nurse.unit_id };
+  },
+
+  async changeNursePassword(nurseId: string, currentPassword: string, newPassword: string) {
+    const { data: nurse, error } = await supabaseAdmin
+      .from('nurses')
+      .select('password_hash')
+      .eq('id', nurseId)
+      .single();
+
+    if (error || !nurse) throw new Error('Akun pengasuh tidak ditemukan');
+    const matches = await bcrypt.compare(currentPassword, nurse.password_hash);
+    if (!matches) throw new Error('Sandi saat ini tidak sesuai');
+    if (newPassword.length < 8) throw new Error('Sandi baru minimal 8 karakter');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const { error: updateError } = await supabaseAdmin
+      .from('nurses')
+      .update({ password_hash: passwordHash })
+      .eq('id', nurseId);
+
+    if (updateError) throw new Error('Sandi gagal diperbarui');
+  },
+
   // Login tenaga medis
   async loginNurse(username: string, password: string) {
     const { data: nurse, error } = await supabaseAdmin

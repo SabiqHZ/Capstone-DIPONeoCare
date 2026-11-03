@@ -5,13 +5,18 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
   Alert,
+  Modal,
+  Pressable,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
+import { Icon } from "../../components/ui/Icon";
 
 import { useAuthStore } from "../../stores/auth.store";
 import {
@@ -27,7 +32,7 @@ import { AlertBanner } from "../../components/ui/AlertBanner";
 import { FaceAnomalyBanner } from "../../components/ui/FaceAnomalyBanner";
 import { ActionButton } from "../../components/ui/ActionButton";
 import { Colors } from "../../constants/colors";
-import { Typography } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 import { DailyReport } from "../../types";
@@ -67,9 +72,12 @@ export default function ParentDashboard() {
 
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [faceAnomalyDismissed, setFaceAnomalyDismissed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const babyName = useAuthStore((s) =>
     s.user?.role === "parent" ? s.user.babyName : "",
@@ -81,7 +89,7 @@ export default function ParentDashboard() {
 
   const logout = useAuthStore((s) => s.logout);
 
-  const fetchBabyProfile = useCallback(async () => {
+  const fetchBabyProfile = useCallback(async (isRefreshing = false) => {
     if (!babyId) {
       setBabyProfile(null);
       setProfileError(true);
@@ -90,36 +98,47 @@ export default function ParentDashboard() {
     }
 
     try {
-      setIsProfileLoading(true);
-      setProfileError(false);
+      if (!isRefreshing) {
+        setIsProfileLoading(true);
+        setProfileError(false);
+      }
 
       const res = await babyService.getBabyById(babyId);
 
       if (!res) {
-        setBabyProfile(null);
-        setProfileError(true);
+        if (!isRefreshing) {
+          setBabyProfile(null);
+          setProfileError(true);
+        }
         return;
       }
 
       setBabyProfile(res as BabyProfile);
+      setProfileError(false);
     } catch (err) {
       console.error("[ParentDashboard] Gagal memuat profil bayi:", err);
 
-      setBabyProfile(null);
-      setProfileError(true);
+      if (!isRefreshing) {
+        setBabyProfile(null);
+        setProfileError(true);
+      }
     } finally {
-      setIsProfileLoading(false);
+      if (!isRefreshing) {
+        setIsProfileLoading(false);
+      }
     }
   }, [babyId]);
 
-  const fetchDailyReport = useCallback(async () => {
+  const fetchDailyReport = useCallback(async (isRefreshing = false) => {
     if (!babyId) {
       setDailyReport(null);
       return;
     }
 
     try {
-      setIsReportLoading(true);
+      if (!isRefreshing) {
+        setIsReportLoading(true);
+      }
 
       const today = new Date().toISOString().split("T")[0];
 
@@ -129,11 +148,25 @@ export default function ParentDashboard() {
     } catch (err) {
       console.error("[ParentDashboard] Gagal memuat laporan harian:", err);
 
-      setDailyReport(null);
+      if (!isRefreshing) {
+        setDailyReport(null);
+      }
     } finally {
-      setIsReportLoading(false);
+      if (!isRefreshing) {
+        setIsReportLoading(false);
+      }
     }
   }, [babyId]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([fetchBabyProfile(true), fetchDailyReport(true)]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchBabyProfile, fetchDailyReport]);
 
   useEffect(() => {
     if (!babyId) return;
@@ -150,9 +183,22 @@ export default function ParentDashboard() {
     }
   }, [status?.faceAnomaly, status?.lastUpdated]);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace("/(auth)/code-entry");
+  const confirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.replace("/(auth)/code-entry");
+    } catch (error) {
+      console.error("[ParentDashboard] Gagal keluar dari akun:", error);
+      setIsLogoutConfirmVisible(false);
+      Alert.alert("Gagal keluar", "Tidak dapat keluar dari akun. Coba lagi.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLogoutConfirmVisible(true);
   };
 
   const formatRelativeTime = (timestamp: string | null) => {
@@ -256,6 +302,14 @@ export default function ParentDashboard() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
       >
         {/* =====================================================
             HEADER
@@ -317,7 +371,7 @@ export default function ParentDashboard() {
               accessibilityRole="button"
               accessibilityLabel="Keluar dari akun"
             >
-              <Text style={styles.logoutText}>Keluar</Text>
+              <Icon name="log-out-outline" library="ionicons" size={21} color={Colors.criticalDark} />
             </TouchableOpacity>
           </View>
         </View>
@@ -330,25 +384,6 @@ export default function ParentDashboard() {
           <View style={styles.monitoringHeaderText}>
             <Text style={styles.monitoringTitle}>Status Bayi</Text>
 
-            <Text style={styles.monitoringSubtitle}>
-              Kondisi terbaru berdasarkan pemantauan
-            </Text>
-          </View>
-
-          <View style={styles.liveIndicator}>
-            <View
-              style={[
-                styles.liveDot,
-                {
-                  backgroundColor:
-                    deviceOnline === true ? Colors.success : Colors.offline,
-                },
-              ]}
-            />
-
-            <Text style={styles.liveText}>
-              {deviceOnline === true ? "LANGSUNG" : "TIDAK AKTIF"}
-            </Text>
           </View>
         </View>
 
@@ -474,9 +509,6 @@ export default function ParentDashboard() {
           <View style={styles.cameraButtonContent}>
             <Text style={styles.cameraButtonTitle}>Lihat Kamera</Text>
 
-            <Text style={styles.cameraButtonSubtitle}>
-              Pantau kondisi bayi secara langsung
-            </Text>
           </View>
 
           <Text style={styles.cameraButtonArrow}>›</Text>
@@ -562,7 +594,7 @@ export default function ParentDashboard() {
             <ActionButton
               variant="parent"
               style={styles.retryButton}
-              onPress={fetchBabyProfile}
+              onPress={() => void fetchBabyProfile()}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Coba muat ulang informasi bayi"
@@ -683,6 +715,81 @@ export default function ParentDashboard() {
           </View>
         )}
       </ScrollView>
+      <Modal
+        visible={isLogoutConfirmVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!isLoggingOut) setIsLogoutConfirmVisible(false);
+        }}
+      >
+        <View style={styles.logoutOverlay}>
+          <BlurView
+            intensity={45}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.logoutScrim]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tutup konfirmasi keluar"
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (!isLoggingOut) setIsLogoutConfirmVisible(false);
+            }}
+          />
+          <View
+            style={styles.logoutCard}
+            accessibilityViewIsModal
+            accessibilityLabel="Konfirmasi keluar akun"
+          >
+            <View style={styles.logoutTopRow}>
+              <View style={styles.logoutIcon}>
+                <Icon name="log-out-outline" library="ionicons" size={24} color={Colors.critical} />
+              </View>
+              <TouchableOpacity
+                style={styles.logoutCloseButton}
+                onPress={() => setIsLogoutConfirmVisible(false)}
+                disabled={isLoggingOut}
+                accessibilityRole="button"
+                accessibilityLabel="Tutup konfirmasi keluar"
+              >
+                <Icon name="close" size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.logoutTitle}>Keluar dari akun?</Text>
+            <Text style={styles.logoutMessage}>
+              Apakah Anda yakin ingin keluar dari akun?
+            </Text>
+            <View style={styles.logoutActions}>
+              <TouchableOpacity
+                style={styles.logoutCancelButton}
+                onPress={() => setIsLogoutConfirmVisible(false)}
+                disabled={isLoggingOut}
+                accessibilityRole="button"
+              >
+                <Text style={styles.logoutCancelText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.logoutConfirmButton}
+                onPress={() => void confirmLogout()}
+                disabled={isLoggingOut}
+                accessibilityRole="button"
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.logoutConfirmText}>Keluar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -773,6 +880,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#B91C1C",
     fontWeight: "600",
+  },
+  logoutOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  logoutScrim: {
+    backgroundColor: "rgba(15, 23, 42, 0.28)",
+  },
+  logoutCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: Colors.white,
+    borderRadius: 18,
+    padding: 24,
+    alignItems: "stretch",
+    gap: 12,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  logoutTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  logoutCloseButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginTop: -8, marginRight: -8 },
+  logoutIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.criticalLight,
+  },
+  logoutTitle: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 18,
+    color: Colors.textPrimary,
+    textAlign: "left",
+  },
+  logoutMessage: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.textMuted,
+    textAlign: "left",
+  },
+  logoutActions: {
+    flexDirection: "row",
+    width: "100%",
+    gap: 12,
+    marginTop: 4,
+  },
+  logoutCancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutCancelText: {
+    fontFamily: Fonts.interRegular,
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  logoutConfirmButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.critical,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutConfirmText: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 14,
+    color: Colors.white,
   },
 
   /* Monitoring */

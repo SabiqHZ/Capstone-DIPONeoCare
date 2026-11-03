@@ -30,7 +30,7 @@ export function AlertBanner({
           isCritical ? styles.criticalIcon : styles.warningIcon,
         ]}
       >
-        <Text style={styles.iconText}>{isCritical ? "!" : "!"}</Text>
+        <Text style={styles.iconText}>!</Text>
       </View>
 
       <View style={styles.textBox}>
@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     borderRadius: Radii.card,
-    padding: Spacing.cardPadding,
-    gap: Spacing.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
   },
 
   critical: {
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
 
   textBox: {
     flex: 1,
-    gap: 5,
+    gap: Spacing.xs,
   },
 
   topRow: {
