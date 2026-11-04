@@ -37,6 +37,7 @@ import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 import { DailyReport } from "../../types";
 import * as Clipboard from "expo-clipboard";
+import { ThemeSwitch, useTheme } from "../../context/ThemeContext";
 
 interface BabyProfile {
   id: string;
@@ -61,6 +62,7 @@ export default function ParentDashboard() {
     );
   };
   const router = useRouter();
+  const { isDark, toggleMode } = useTheme();
 
   const { setFocused, acknowledgeAlert } = useBabyContext();
   const status = useFocusedBabyStatus();
@@ -297,7 +299,7 @@ export default function ParentDashboard() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -317,20 +319,21 @@ export default function ParentDashboard() {
 
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Halo, Orang Tua</Text>
+            <Text style={[styles.greeting, isDark && { color: "#86EFAC" }]}>Halo, Orang Tua</Text>
 
-            <Text style={styles.babyName}>
+            <Text style={[styles.babyName, isDark && { color: "#F9FAFB" }]}>
               {babyName || babyProfile?.name || "Bayi"}
             </Text>
 
             {babyProfile?.bed_number ? (
-              <Text style={styles.bedNumber}>
+              <Text style={[styles.bedNumber, isDark && { color: "#9CA3AF" }]}>
                 Tempat tidur {babyProfile.bed_number}
               </Text>
             ) : null}
           </View>
 
           <View style={styles.headerRight}>
+            <ThemeSwitch />
             <View
               style={[
                 styles.deviceBadge,
@@ -382,7 +385,7 @@ export default function ParentDashboard() {
 
         <View style={styles.monitoringHeader}>
           <View style={styles.monitoringHeaderText}>
-            <Text style={styles.monitoringTitle}>Status Bayi</Text>
+            <Text style={[styles.monitoringTitle, isDark && { color: "#D1FAE5" }]}>Status Bayi</Text>
 
           </View>
         </View>
@@ -400,10 +403,10 @@ export default function ParentDashboard() {
             faceAnomaly={status.faceAnomaly}
           />
         ) : (
-          <View style={styles.monitoringLoading}>
+          <View style={[styles.monitoringLoading, isDark && { backgroundColor: "#1F2937" }]}>
             <ActivityIndicator size="small" color="#1D9E75" />
 
-            <Text style={styles.monitoringLoadingText}>
+            <Text style={[styles.monitoringLoadingText, isDark && { color: "#D1D5DB" }]}>
               Menghubungkan ke data bayi...
             </Text>
           </View>
@@ -453,7 +456,7 @@ export default function ParentDashboard() {
         {visibleAlerts.length > 0 ? (
           <View style={styles.alertSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Perlu perhatian</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}>Perlu perhatian</Text>
 
               <Text style={styles.alertCount}>{visibleAlerts.length}</Text>
             </View>
@@ -518,12 +521,12 @@ export default function ParentDashboard() {
             DAILY SUMMARY
         ====================================================== */}
 
-        <View style={styles.todaySection}>
+        <View style={[styles.todaySection, isDark && { backgroundColor: "#1F2937" }]}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>Ringkasan Hari Ini</Text>
+              <Text style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}>Ringkasan Hari Ini</Text>
 
-              <Text style={styles.sectionSubtitle}>
+              <Text style={[styles.sectionSubtitle, isDark && { color: "#9CA3AF" }]}>
                 Aktivitas bayi hari ini
               </Text>
             </View>
@@ -546,26 +549,26 @@ export default function ParentDashboard() {
             </View>
           ) : (
             <View style={styles.summaryGrid}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>
+              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
+                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>
                   {formatDuration(todaySleepMinutes)}
                 </Text>
 
-                <Text style={styles.summaryLabel}>Tidur</Text>
+                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Tidur</Text>
               </View>
 
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>
+              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
+                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>
                   {formatDuration(todayAwakeMinutes)}
                 </Text>
 
-                <Text style={styles.summaryLabel}>Bangun</Text>
+                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Bangun</Text>
               </View>
 
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{todayCryingEvents}x</Text>
+              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
+                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>{todayCryingEvents}x</Text>
 
-                <Text style={styles.summaryLabel}>Menangis</Text>
+                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Menangis</Text>
               </View>
             </View>
           )}
@@ -576,13 +579,13 @@ export default function ParentDashboard() {
         ====================================================== */}
 
         {isProfileLoading ? (
-          <View style={styles.loadingBox}>
+          <View style={[styles.loadingBox, isDark && { backgroundColor: "#1F2937" }]}>
             <ActivityIndicator size="small" color="#1D9E75" />
 
             <Text style={styles.loadingText}>Memuat informasi bayi...</Text>
           </View>
         ) : profileError || !babyProfile ? (
-          <View style={styles.loadingBox}>
+          <View style={[styles.loadingBox, isDark && { backgroundColor: "#1F2937" }]}>
             <Text style={styles.profileErrorTitle}>
               Informasi bayi belum dapat dimuat
             </Text>
@@ -603,22 +606,22 @@ export default function ParentDashboard() {
             </ActionButton>
           </View>
         ) : (
-          <View style={styles.identityCard}>
-            <Text style={styles.cardTitle}>Informasi Bayi</Text>
+          <View style={[styles.identityCard, isDark && { backgroundColor: "#1F2937" }]}>
+            <Text style={[styles.cardTitle, isDark && { color: "#D1FAE5" }]}>Informasi Bayi</Text>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, isDark && { backgroundColor: "#374151" }]} />
 
             <View style={styles.compactIdentity}>
-              <View style={styles.compactIdentityItem}>
+              <View style={[styles.compactIdentityItem, isDark && { backgroundColor: "#111827" }]}>
                 <Text style={styles.infoLabel}>Nama</Text>
 
-                <Text style={styles.infoValue}>{babyProfile.name}</Text>
+                <Text style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}>{babyProfile.name}</Text>
               </View>
 
-              <View style={styles.compactIdentityItem}>
+              <View style={[styles.compactIdentityItem, isDark && { backgroundColor: "#111827" }]}>
                 <Text style={styles.infoLabel}>Tempat tidur</Text>
 
-                <Text style={styles.infoValue}>{babyProfile.bed_number}</Text>
+                <Text style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}>{babyProfile.bed_number}</Text>
               </View>
             </View>
 
@@ -743,7 +746,7 @@ export default function ParentDashboard() {
             }}
           />
           <View
-            style={styles.logoutCard}
+            style={[styles.logoutCard, isDark && { backgroundColor: "#1F2937" }]}
             accessibilityViewIsModal
             accessibilityLabel="Konfirmasi keluar akun"
           >

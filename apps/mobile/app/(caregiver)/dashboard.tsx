@@ -29,6 +29,7 @@ import { MuteToggle } from "../../components/ui/MuteToggle";
 import { ActionButton } from "../../components/ui/ActionButton";
 // INJEKSI REALTIME: Import context
 import { useAllBabyStatuses, useActiveAlerts, useBabyContext } from "../../context/BabyContext";
+import { ThemeSwitch, useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 2;
@@ -76,9 +77,11 @@ const activityColor: Record<string, string> = {
 function BabyCard({
   baby,
   onPress,
+  isDark,
 }: {
   baby: BabyWithStatus;
   onPress: () => void;
+  isDark: boolean;
 }) {
   // INJEKSI REALTIME: Membaca status real-time dari context, fallback ke data statis jika context kosong
   const realtimeStatuses = useAllBabyStatuses();
@@ -116,13 +119,14 @@ function BabyCard({
     <TouchableOpacity
       style={[
         styles.card,
+        isDark && { backgroundColor: "#1F2937" },
         { borderTopColor: borderColor, borderTopWidth: 3 },
         !isOnline && styles.cardOffline,
       ]}
       onPress={onPress}
       activeOpacity={0.85}
     >
-      <View style={styles.cardThumb}>
+      <View style={[styles.cardThumb, isDark && { backgroundColor: "#374151" }]}>
         <Icon
           name="baby-face-outline"
           library="material"
@@ -166,10 +170,10 @@ function BabyCard({
       </View>
 
       <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={1}>
+        <Text style={[styles.cardName, isDark && { color: "#F9FAFB" }]} numberOfLines={1}>
           {baby.name}
         </Text>
-        <Text style={styles.cardBed}>Tempat tidur {baby.bed_number}</Text>
+        <Text style={[styles.cardBed, isDark && { color: "#9CA3AF" }]}>Tempat tidur {baby.bed_number}</Text>
 
         <View
           style={[
@@ -213,6 +217,7 @@ function BabyCard({
 }
 
 export default function NurseDashboard() {
+  const { isDark, toggleMode } = useTheme();
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
@@ -388,8 +393,8 @@ export default function NurseDashboard() {
   if (!user || user.role !== "caregiver") return null;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
         <TouchableOpacity
           style={styles.headerIconButton}
           onPress={() => setIsMenuVisible(true)}
@@ -409,7 +414,7 @@ export default function NurseDashboard() {
               ],
             }}
           >
-            <Icon name="menu" size={24} color={Colors.textPrimary} />
+          <Icon name="menu" size={24} color={isDark ? "#F9FAFB" : Colors.textPrimary} />
           </Animated.View>
         </TouchableOpacity>
 
@@ -423,7 +428,7 @@ export default function NurseDashboard() {
               }),
               backgroundColor: searchExpansion.interpolate({
                 inputRange: [0, 1],
-                outputRange: ["rgba(230, 241, 251, 0)", Colors.secondaryLight],
+                outputRange: ["rgba(230, 241, 251, 0)", isDark ? "#263548" : Colors.secondaryLight],
               }),
             },
           ]}
@@ -474,7 +479,7 @@ export default function NurseDashboard() {
           accessibilityRole="button"
           accessibilityLabel={`Notifikasi${activeAlerts.length ? `, ${activeAlerts.length} belum ditangani` : ""}`}
         >
-          <Icon name="notifications-outline" size={23} color={Colors.textPrimary} />
+          <Icon name="notifications-outline" size={23} color={isDark ? "#F9FAFB" : Colors.textPrimary} />
           {activeAlerts.length > 0 ? <View style={styles.bellDot} /> : null}
         </TouchableOpacity>
 
@@ -487,40 +492,41 @@ export default function NurseDashboard() {
           <View style={styles.profileAvatar}>
             <Text style={styles.profileInitial}>{user.name?.trim()?.[0]?.toUpperCase() ?? "P"}</Text>
           </View>
-          <Icon name="chevron-down" size={16} color={Colors.textMuted} />
+          <Icon name="chevron-down" size={16} color={isDark ? "#9CA3AF" : Colors.textMuted} />
         </TouchableOpacity>
+        <ThemeSwitch />
       </View>
 
-      <View style={styles.summaryBar}>
+      <View style={[styles.summaryBar, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNum}>{babies.length}</Text>
-          <Text style={styles.summaryLabel}>Total Bayi</Text>
+          <Text style={[styles.summaryNum, isDark && { color: "#F9FAFB" }]}>{babies.length}</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Total Bayi</Text>
         </View>
-        <View style={styles.summaryDivider} />
+        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.success }]}>
             {onlineCount}
           </Text>
-          <Text style={styles.summaryLabel}>Kamera aktif</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Kamera aktif</Text>
         </View>
-        <View style={styles.summaryDivider} />
+        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.critical }]}>
             {cryingCount}
           </Text>
-          <Text style={styles.summaryLabel}>Menangis</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Menangis</Text>
         </View>
-        <View style={styles.summaryDivider} />
+        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.warningDark }]}>
             {faceAnomalyCount}
           </Text>
-          <Text style={styles.summaryLabel}>Perlu diperiksa</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Perlu diperiksa</Text>
         </View>
       </View>
 
       {!isLoading && !error && babies.length > 0 ? (
-        <View style={styles.listControls}>
+        <View style={[styles.listControls, isDark && { backgroundColor: "#111827" }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -534,11 +540,12 @@ export default function NurseDashboard() {
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   onPress={() => setActiveFilter(filter.key)}
-                  style={[styles.filterChip, selected && styles.filterChipActive]}
+                  style={[styles.filterChip, isDark && { backgroundColor: "#1F2937", borderColor: "#4B5563" }, selected && styles.filterChipActive]}
                 >
                   <Text
                     style={[
                       styles.filterChipText,
+                      isDark && { color: "#D1D5DB" },
                       selected && styles.filterChipTextActive,
                     ]}
                   >
@@ -554,7 +561,7 @@ export default function NurseDashboard() {
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={Colors.secondary} />
-          <Text style={styles.loadingText}>Memuat data bayi...</Text>
+          <Text style={[styles.loadingText, isDark && { color: "#D1D5DB" }]}>Memuat data bayi...</Text>
         </View>
       ) : error ? (
         <View style={styles.centerBox}>
@@ -564,7 +571,7 @@ export default function NurseDashboard() {
             size={48}
             color={Colors.textDisabled}
           />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, isDark && { color: "#D1D5DB" }]}>{error}</Text>
           <ActionButton
             variant="caregiver"
             style={styles.retryBtn}
@@ -581,8 +588,8 @@ export default function NurseDashboard() {
             size={64}
             color={Colors.textDisabled}
           />
-          <Text style={styles.emptyTitle}>Belum Ada Bayi</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>Belum Ada Bayi</Text>
+          <Text style={[styles.emptyText, isDark && { color: "#9CA3AF" }]}>
             Tap tombol + untuk mendaftarkan bayi baru
           </Text>
           <TouchableOpacity
@@ -618,19 +625,20 @@ export default function NurseDashboard() {
               <BabyCard
                 key={baby.id}
                 baby={baby}
+                isDark={isDark}
                 onPress={() => router.push(`/(caregiver)/baby/${baby.id}`)}
               />
             ))
           ) : (
-            <View style={styles.filterEmptyBox}>
+          <View style={[styles.filterEmptyBox, isDark && { backgroundColor: "#111827" }]}>
               <Icon
                 name="search-outline"
                 library="ionicons"
                 size={36}
                 color={Colors.textDisabled}
               />
-              <Text style={styles.emptyTitle}>Bayi tidak ditemukan</Text>
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>Bayi tidak ditemukan</Text>
+              <Text style={[styles.emptyText, isDark && { color: "#9CA3AF" }]}>
                 Coba ubah kata pencarian atau pilih filter lain.
               </Text>
               <TouchableOpacity
@@ -651,7 +659,7 @@ export default function NurseDashboard() {
         <TouchableWithoutFeedback onPress={() => setIsMenuVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.dropdownMenu}>
+              <View style={[styles.dropdownMenu, isDark && { backgroundColor: "#1F2937" }]}>
                 <TouchableOpacity
                   style={styles.dropdownItem}
                   onPress={() => {
@@ -668,8 +676,8 @@ export default function NurseDashboard() {
                     />
                   </View>
                   <View>
-                    <Text style={styles.dropdownTitle}>Daftarkan Bayi</Text>
-                    <Text style={styles.dropdownDesc}>
+                    <Text style={[styles.dropdownTitle, isDark && { color: "#F9FAFB" }]}>Daftarkan Bayi</Text>
+                    <Text style={[styles.dropdownDesc, isDark && { color: "#9CA3AF" }]}>
                       Tambah profil bayi baru
                     </Text>
                   </View>
@@ -687,7 +695,7 @@ export default function NurseDashboard() {
                   <View
                     style={[
                       styles.dropdownIconBox,
-                      { backgroundColor: Colors.primaryLight },
+                      { backgroundColor: isDark ? "#26372F" : Colors.primaryLight },
                     ]}
                   >
                     <Icon
@@ -698,10 +706,10 @@ export default function NurseDashboard() {
                     />
                   </View>
                   <View>
-                    <Text style={styles.dropdownTitle}>
+                    <Text style={[styles.dropdownTitle, isDark && { color: "#F9FAFB" }]}>
                       Konfigurasi Perangkat
                     </Text>
-                    <Text style={styles.dropdownDesc}>Atur kamera baru</Text>
+                    <Text style={[styles.dropdownDesc, isDark && { color: "#9CA3AF" }]}>Atur kamera baru</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -718,9 +726,9 @@ export default function NurseDashboard() {
         <TouchableWithoutFeedback onPress={() => setIsProfileMenuVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.profileDropdown}>
-                <Text style={styles.profileDropdownName}>{user.name}</Text>
-                <Text style={styles.profileDropdownRole}>Pengasuh</Text>
+              <View style={[styles.profileDropdown, isDark && { backgroundColor: "#1F2937" }]}>
+                <Text style={[styles.profileDropdownName, isDark && { color: "#F9FAFB" }]}>{user.name}</Text>
+                <Text style={[styles.profileDropdownRole, isDark && { color: "#9CA3AF" }]}>Pengasuh</Text>
                 <View style={styles.dropdownDivider} />
                 <TouchableOpacity
                   style={styles.profileOption}
@@ -731,7 +739,7 @@ export default function NurseDashboard() {
                   accessibilityRole="button"
                 >
                   <Icon name="person-outline" size={19} color={Colors.textSecondary} />
-                  <Text style={styles.profileOptionText}>Profil</Text>
+                  <Text style={[styles.profileOptionText, isDark && { color: "#F3F4F6" }]}>Profil</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.profileOption}
@@ -772,7 +780,7 @@ export default function NurseDashboard() {
             style={StyleSheet.absoluteFill}
             onPress={() => setIsAlertsVisible(false)}
           />
-          <View style={styles.alertsCard} accessibilityViewIsModal>
+              <View style={[styles.alertsCard, isDark && { backgroundColor: "#1F2937" }]} accessibilityViewIsModal>
             <View style={styles.alertsHeader}>
               <View style={styles.alertsHeading}>
                 <Text style={styles.logoutTitle}>Notifikasi</Text>

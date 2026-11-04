@@ -15,6 +15,55 @@ export const authController = {
     }
   },
 
+  async updateNurseProfile(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { name, username, currentPassword, newPassword } = req.body;
+      const fields = { name, username, currentPassword, newPassword };
+      for (const [field, value] of Object.entries(fields)) {
+        if (value !== undefined && typeof value !== 'string') {
+          res.status(400).json({ success: false, error: `${field} harus berupa teks` });
+          return;
+        }
+      }
+
+      if (typeof name === 'string' && !name.trim()) {
+        res.status(400).json({ success: false, error: 'Nama wajib diisi' });
+        return;
+      }
+      if (typeof username === 'string' && !username.trim()) {
+        res.status(400).json({ success: false, error: 'Username wajib diisi' });
+        return;
+      }
+      if (newPassword !== undefined && typeof currentPassword !== 'string') {
+        res.status(400).json({ success: false, error: 'Sandi saat ini wajib diisi' });
+        return;
+      }
+      if (currentPassword !== undefined && newPassword === undefined) {
+        res.status(400).json({ success: false, error: 'Sandi baru wajib diisi' });
+        return;
+      }
+      if (typeof newPassword === 'string' && newPassword.length < 8) {
+        res.status(400).json({ success: false, error: 'Sandi baru minimal 8 karakter' });
+        return;
+      }
+      if (name === undefined && username === undefined && newPassword === undefined) {
+        res.status(400).json({ success: false, error: 'Tidak ada perubahan untuk disimpan' });
+        return;
+      }
+
+      const data = await authService.updateNurseProfile(req.user!.sub, {
+        name,
+        username,
+        currentPassword,
+        newPassword,
+      });
+      res.json({ success: true, data });
+    } catch (err: any) {
+      const response: ApiResponse = { success: false, error: err.message };
+      res.status(400).json(response);
+    }
+  },
+
   async changeNursePassword(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { currentPassword, newPassword } = req.body;

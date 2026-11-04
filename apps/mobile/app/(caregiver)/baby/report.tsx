@@ -16,6 +16,7 @@ import { Fonts, Typography } from "../../../constants/fonts";
 import { Radii, Spacing } from "../../../constants/ui";
 import { reportService } from "../../../services/report.service";
 import { ReportHistoryItem } from "../../../types";
+import { useTheme } from "../../../context/ThemeContext";
 
 // Catatan: Pastikan interface DailyReport di types.ts milikmu sudah diubah menjadi seperti ini!
 interface DailyReport {
@@ -33,6 +34,7 @@ interface DailyReport {
 }
 
 export default function NurseBabyReportScreen() {
+  const { isDark } = useTheme();
   const router = useRouter();
   const { babyId, babyName } = useLocalSearchParams<{
     babyId: string;
@@ -122,7 +124,7 @@ export default function NurseBabyReportScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}

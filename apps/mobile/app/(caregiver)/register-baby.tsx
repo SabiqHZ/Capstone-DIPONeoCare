@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  FlatList,
   Platform,
   RefreshControl,
 } from "react-native";
@@ -25,6 +24,8 @@ import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { babyService } from "../../services/baby.service";
 import api from "../../services/api"; // Pastikan path ini benar sesuai strukturmu
 import { RegisteredBaby } from "../../types";
+import { SuccessModal } from "../../components/ui/SuccessModal";
+import { useTheme } from "../../context/ThemeContext";
 
 interface BabyForm {
   name: string;
@@ -86,16 +87,9 @@ const dateInputToApiDate = (value: string): string => {
   return `${year}-${month}-${day}`;
 };
 
-const BED_LETTERS = Array.from({ length: 26 }, (_, index) =>
-  String.fromCharCode(65 + index),
-);
-const BED_NUMBERS = Array.from({ length: 100 }, (_, index) =>
-  String(index).padStart(2, "0"),
-);
-const BED_WHEEL_ITEM_HEIGHT = 28;
-
 export default function RegisterBabyScreen() {
   const router = useRouter();
+  const { isDark } = useTheme();
   const [form, setForm] = useState<BabyForm>({
     name: "",
     bedNumber: "A-00",
@@ -108,13 +102,15 @@ export default function RegisterBabyScreen() {
   const [registeredBaby, setRegisteredBaby] = useState<RegisteredBaby | null>(
     null,
   );
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
+  const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
+  const [focusedField, setFocusedField] = useState<"date" | "camera" | null>(null);
 
   // State untuk Dropdown Kamera
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(true);
-  const [isDeviceModalVisible, setIsDeviceModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch daftar kamera yang nganggur saat halaman dimuat
@@ -149,22 +145,27 @@ export default function RegisterBabyScreen() {
   const update = (key: keyof BabyForm, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const updateBedLetter = (letter: string) =>
-    setForm((current) => ({
-      ...current,
-      bedNumber: `${letter}-${current.bedNumber.slice(-2) || "00"}`,
-    }));
+  const updateBedPart = (part: 0 | 1 | 2, value: string) =>
+    setForm((current) => {
+      const [letter = "", digits = ""] = current.bedNumber.split("-");
+      const digitParts = [digits[0] ?? "", digits[1] ?? ""];
 
-  const updateBedDigits = (number: string) =>
-    setForm((current) => ({
-      ...current,
-      bedNumber: `${current.bedNumber[0] || "A"}-${number}`,
-    }));
+      if (part === 0) {
+        return {
+          ...current,
+          bedNumber: `${value.replace(/[^a-z]/gi, "").slice(0, 1).toUpperCase()}-${digits}`,
+        };
+      }
+
+      digitParts[part - 1] = value.replace(/\D/g, "").slice(-1);
+      return { ...current, bedNumber: `${letter}-${digitParts.join("")}` };
+    });
 
   const openDatePicker = () => {
     const initialDate = parseDateInput(form.dateOfBirth) ?? new Date();
     const maximumDate = new Date();
     setPickerDate(initialDate);
+    setFocusedField("date");
 
     if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
@@ -178,6 +179,7 @@ export default function RegisterBabyScreen() {
           if (event.type === "set" && selectedDate) {
             update("dateOfBirth", formatDateInput(selectedDate));
           }
+          setFocusedField(null);
         },
       });
       return;
@@ -188,7 +190,7 @@ export default function RegisterBabyScreen() {
 
   const isValid =
     form.name.trim() !== "" &&
-    form.bedNumber.trim() !== "" &&
+    /^[A-Z]-\d{2}$/.test(form.bedNumber) &&
     form.dateOfBirth.trim() !== "" &&
     form.parentName.trim() !== "" &&
     form.deviceId !== ""; // Wajib pilih kamera
@@ -228,6 +230,7 @@ export default function RegisterBabyScreen() {
 
       // Tandai sukses
       setRegisteredBaby(baby);
+      setIsSuccessModalVisible(true);
     } catch {
       Alert.alert(
         "Gagal mendaftarkan bayi",
@@ -241,7 +244,7 @@ export default function RegisterBabyScreen() {
   // ── Tampilan sukses ───────────────────────────────────────────────
   if (registeredBaby) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
         <ScrollView contentContainerStyle={styles.successContainer}>
           <View style={styles.successIconWrapper}>
             <Icon
@@ -252,12 +255,12 @@ export default function RegisterBabyScreen() {
             />
           </View>
 
-          <Text style={styles.successTitle}>Bayi & Kamera Tersambung!</Text>
-          <Text style={styles.successSub}>
+          <Text style={[styles.successTitle, isDark && { color: "#A7F3D0" }]}>Bayi & Kamera Tersambung!</Text>
+          <Text style={[styles.successSub, isDark && { color: "#9CA3AF" }]}>
             Sistem pemantauan aktif. Berikan kode berikut kepada orang tua.
           </Text>
 
-          <View style={styles.codeBox}>
+          <View style={[styles.codeBox, isDark && { backgroundColor: "#26372F" }]}>
             <Text style={styles.codeLabel}>KODE AKSES ORANG TUA</Text>
             <Text style={styles.codeValue}>{registeredBaby.uniqueCode}</Text>
             <Text style={styles.codeNote}>
@@ -265,7 +268,7 @@ export default function RegisterBabyScreen() {
             </Text>
           </View>
 
-          <View style={styles.babyInfoBox}>
+          <View style={[styles.babyInfoBox, isDark && { backgroundColor: "#1F2937", borderColor: "#374151" }]}>
             <View style={styles.babyInfoRow}>
               <Icon
                 name="baby-face-outline"
@@ -273,7 +276,7 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={styles.babyInfoText}>{registeredBaby.name}</Text>
+              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>{registeredBaby.name}</Text>
             </View>
             <View style={styles.babyInfoRow}>
               <Icon
@@ -282,7 +285,7 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={styles.babyInfoText}>
+              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>
                 Tempat Tidur {registeredBaby.bedNumber}
               </Text>
             </View>
@@ -293,7 +296,7 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={styles.babyInfoText}>
+              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>
                 {availableDevices.find((d) => d.id === form.deviceId)?.name ||
                   "Kamera Terhubung"}
               </Text>
@@ -330,14 +333,21 @@ export default function RegisterBabyScreen() {
             <Text style={styles.backToDashText}>Kembali ke Beranda</Text>
           </TouchableOpacity>
         </ScrollView>
+        <SuccessModal
+          visible={isSuccessModalVisible}
+          title="Bayi dan kamera berhasil ditambahkan"
+          message="Data bayi telah disimpan dan kamera berhasil dihubungkan ke sistem."
+          buttonLabel="Lihat detail"
+          onClose={() => setIsSuccessModalVisible(false)}
+        />
       </SafeAreaView>
     );
   }
 
   // ── Form ──────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerBack}
@@ -346,10 +356,10 @@ export default function RegisterBabyScreen() {
             name="arrow-back"
             library="ionicons"
             size={22}
-            color={Colors.secondaryDark}
+            color={isDark ? "#BFDBFE" : Colors.secondaryDark}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Daftarkan Bayi Baru</Text>
+        <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>Daftarkan Bayi Baru</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -366,20 +376,20 @@ export default function RegisterBabyScreen() {
           />
         }
       >
-        <View style={styles.infoBox}>
+        <View style={[styles.infoBox, isDark && { backgroundColor: "#1E3448" }]}>
           <Icon
             name="information-circle-outline"
             library="ionicons"
             size={18}
             color={Colors.secondary}
           />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, isDark && { color: "#BFDBFE" }]}>
             Pilih kamera yang belum terpakai untuk memantau bayi secara
             otomatis.
           </Text>
         </View>
 
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, isDark && { backgroundColor: "#1F2937" }]}>
           <Field
             label="Nama Bayi"
             placeholder="contoh: Bayi Budi Santoso"
@@ -387,30 +397,19 @@ export default function RegisterBabyScreen() {
             onChangeText={(v) => update("name", v)}
             icon="baby-face-outline"
             iconLibrary="material"
+            isDark={isDark}
+          />
+          <View style={styles.divider} />
+          <BedNumberField
+            value={form.bedNumber}
+            onChangePart={updateBedPart}
+            isDark={isDark}
           />
           <View style={styles.divider} />
           <View style={fieldStyles.wrapper}>
-            <Text style={fieldStyles.label}>Nomor Tempat Tidur</Text>
-            <View style={styles.bedPickerRow}>
-              <BedWheelColumn
-                label="Huruf"
-                values={BED_LETTERS}
-                selectedValue={form.bedNumber[0] || "A"}
-                onSelect={updateBedLetter}
-              />
-              <BedWheelColumn
-                label="Nomor"
-                values={BED_NUMBERS}
-                selectedValue={form.bedNumber.slice(-2) || "00"}
-                onSelect={updateBedDigits}
-              />
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={fieldStyles.wrapper}>
-            <Text style={fieldStyles.label}>Tanggal Lahir</Text>
+            <Text style={[fieldStyles.label, { color: focusedField === "date" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.white }]}>Tanggal Lahir</Text>
             <TouchableOpacity
-              style={fieldStyles.inputRow}
+              style={[fieldStyles.inputRow, { borderColor: focusedField === "date" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: focusedField === "date" ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}
               onPress={openDatePicker}
               accessibilityRole="button"
               accessibilityLabel="Pilih tanggal lahir dari kalender"
@@ -425,6 +424,7 @@ export default function RegisterBabyScreen() {
               <Text
                 style={[
                   fieldStyles.input,
+                  isDark && { color: form.dateOfBirth ? "#F9FAFB" : "#9CA3AF" },
                   !form.dateOfBirth && fieldStyles.datePlaceholder,
                 ]}
               >
@@ -440,16 +440,19 @@ export default function RegisterBabyScreen() {
             onChangeText={(v) => update("parentName", v)}
             icon="person-outline"
             iconLibrary="ionicons"
+            isDark={isDark}
           />
           <View style={styles.divider} />
 
           {/* Custom Dropdown untuk Pilih Kamera */}
           <View style={fieldStyles.wrapper}>
-            <Text style={fieldStyles.label}>Pilih Kamera Pemantau</Text>
+            <Text style={[fieldStyles.label, { color: isDeviceDropdownOpen ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.white }]}>Pilih Kamera Pemantau</Text>
             <TouchableOpacity
-              style={fieldStyles.dropdownButton}
-              onPress={() => setIsDeviceModalVisible(true)}
+              style={[fieldStyles.dropdownButton, { borderColor: isDeviceDropdownOpen ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: isDeviceDropdownOpen ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}
+              onPress={() => setIsDeviceDropdownOpen((open) => !open)}
               disabled={isLoadingDevices}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isDeviceDropdownOpen, disabled: isLoadingDevices }}
             >
               <Icon
                 name="videocam-outline"
@@ -460,8 +463,8 @@ export default function RegisterBabyScreen() {
               <Text
                 style={
                   form.deviceId
-                    ? fieldStyles.dropdownSelectedText
-                    : fieldStyles.dropdownPlaceholder
+                    ? [fieldStyles.dropdownSelectedText, isDark && { color: "#F9FAFB" }]
+                    : [fieldStyles.dropdownPlaceholder, isDark && { color: "#9CA3AF" }]
                 }
               >
                 {isLoadingDevices
@@ -473,12 +476,44 @@ export default function RegisterBabyScreen() {
                       : "Pilih Kamera..."}
               </Text>
               <Icon
-                name="chevron-down"
+                name={isDeviceDropdownOpen ? "chevron-up" : "chevron-down"}
                 library="ionicons"
                 size={18}
                 color={Colors.textMuted}
               />
             </TouchableOpacity>
+            {isDeviceDropdownOpen ? (
+              <ScrollView
+                style={[fieldStyles.dropdownMenu, isDark && { backgroundColor: "#111827", borderColor: "#4B5563" }]}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
+                {availableDevices.length === 0 ? (
+                  <Text style={[fieldStyles.dropdownEmpty, isDark && { color: "#9CA3AF" }]}>
+                    Semua kamera sedang digunakan. Tambahkan perangkat baru terlebih dahulu.
+                  </Text>
+                ) : (
+                  availableDevices.map((device) => (
+                    <TouchableOpacity
+                      key={device.id}
+                      style={[fieldStyles.dropdownOption, isDark && { borderBottomColor: "#374151" }]}
+                      onPress={() => {
+                        update("deviceId", device.id);
+                        setIsDeviceDropdownOpen(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Pilih kamera ${device.name}`}
+                    >
+                      <Icon name="videocam-outline" library="ionicons" size={18} color={Colors.secondary} />
+                      <View style={fieldStyles.dropdownOptionText}>
+                        <Text style={[fieldStyles.dropdownSelectedText, isDark && { color: "#F9FAFB" }]}>{device.name}</Text>
+                        <Text style={[fieldStyles.dropdownMac, isDark && { color: "#9CA3AF" }]}>{device.mac_address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            ) : null}
           </View>
         </View>
 
@@ -509,69 +544,24 @@ export default function RegisterBabyScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal Dropdown Kamera */}
-      <Modal visible={isDeviceModalVisible} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDeviceModalVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pilih Kamera</Text>
-            {availableDevices.length === 0 ? (
-              <Text style={styles.modalEmptyText}>
-                Semua kamera sedang digunakan. Tambahkan perangkat baru terlebih
-                dahulu.
-              </Text>
-            ) : (
-              <FlatList
-                data={availableDevices}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => {
-                      update("deviceId", item.id);
-                      setIsDeviceModalVisible(false);
-                    }}
-                  >
-                    <Icon
-                      name="videocam-outline"
-                      library="ionicons"
-                      size={20}
-                      color={Colors.secondary}
-                    />
-                    <View>
-                      <Text style={styles.modalItemName}>{item.name}</Text>
-                      <Text style={styles.modalItemMac}>
-                        {item.mac_address}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setIsDeviceModalVisible(false)}
-            >
-              <Text style={styles.modalCloseText}>Batal</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
       {Platform.OS === "ios" ? (
         <Modal
           visible={isDatePickerVisible}
           transparent
           animationType="slide"
-          onRequestClose={() => setIsDatePickerVisible(false)}
+          onRequestClose={() => {
+            setIsDatePickerVisible(false);
+            setFocusedField(null);
+          }}
         >
           <View style={styles.datePickerOverlay}>
-            <View style={styles.datePickerModal}>
+            <View style={[styles.datePickerModal, isDark && { backgroundColor: "#1F2937" }]}>
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity
-                  onPress={() => setIsDatePickerVisible(false)}
+                  onPress={() => {
+                    setIsDatePickerVisible(false);
+                    setFocusedField(null);
+                  }}
                   accessibilityRole="button"
                 >
                   <Text style={styles.datePickerAction}>Batal</Text>
@@ -580,6 +570,7 @@ export default function RegisterBabyScreen() {
                   onPress={() => {
                     update("dateOfBirth", formatDateInput(pickerDate));
                     setIsDatePickerVisible(false);
+                    setFocusedField(null);
                   }}
                   accessibilityRole="button"
                 >
@@ -591,7 +582,7 @@ export default function RegisterBabyScreen() {
                 mode="date"
                 display="inline"
                 locale="id-ID"
-                themeVariant="light"
+                themeVariant={isDark ? "dark" : "light"}
                 minimumDate={new Date(1900, 0, 1)}
                 maximumDate={new Date()}
                 onChange={(_event, selectedDate) => {
@@ -618,68 +609,75 @@ interface FieldProps {
   icon: string;
   iconLibrary?: "ionicons" | "material" | "feather";
   keyboardType?: "default" | "numeric";
+  isDark?: boolean;
   maxLength?: number;
 }
 
-interface BedWheelColumnProps {
-  label: string;
-  values: string[];
-  selectedValue: string;
-  onSelect: (value: string) => void;
-}
+function BedNumberField({
+  value,
+  onChangePart,
+  isDark,
+}: {
+  value: string;
+  onChangePart: (part: 0 | 1 | 2, value: string) => void;
+  isDark: boolean;
+}) {
+  const [letter = "", digits = ""] = value.split("-");
+  const [focusedPart, setFocusedPart] = useState<number | null>(null);
+  const letterRef = useRef<TextInput>(null);
+  const firstDigitRef = useRef<TextInput>(null);
+  const secondDigitRef = useRef<TextInput>(null);
 
-function BedWheelColumn({
-  label,
-  values,
-  selectedValue,
-  onSelect,
-}: BedWheelColumnProps) {
-  const selectedIndex = Math.max(0, values.indexOf(selectedValue));
+  const parts = [
+    { index: 0 as const, value: letter, ref: letterRef, label: "Huruf", keyboardType: "default" as const },
+    { index: 1 as const, value: digits[0] ?? "", ref: firstDigitRef, label: "Digit pertama", keyboardType: "number-pad" as const },
+    { index: 2 as const, value: digits[1] ?? "", ref: secondDigitRef, label: "Digit kedua", keyboardType: "number-pad" as const },
+  ];
 
   return (
-    <View style={styles.bedPickerColumn}>
-      <Text style={styles.bedPickerLabel}>{label}</Text>
-      <FlatList
-        data={values}
-        initialScrollIndex={selectedIndex}
-        getItemLayout={(_data, index) => ({
-          length: BED_WHEEL_ITEM_HEIGHT,
-          offset: BED_WHEEL_ITEM_HEIGHT * index,
-          index,
-        })}
-        keyExtractor={(item) => item}
-        nestedScrollEnabled
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(
-            event.nativeEvent.contentOffset.y / BED_WHEEL_ITEM_HEIGHT,
-          );
-          const value = values[index];
-          if (value) onSelect(value);
-        }}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bedPickerItem,
-              item === selectedValue && styles.bedPickerItemSelected,
-            ]}
-          >
-            <Text
+    <View style={fieldStyles.bedNumberWrapper}>
+      <Text style={[fieldStyles.bedNumberLabel, { color: focusedPart !== null ? Colors.secondary : isDark ? "#4B5563" : Colors.border }]}>
+        Nomor Tempat Tidur
+      </Text>
+      <View style={fieldStyles.bedNumberRow}>
+        {parts.map((part) => (
+          <View key={part.label} style={fieldStyles.bedNumberPart}>
+            {part.index === 1 ? <Text style={[fieldStyles.bedNumberSeparator, isDark && { color: "#9CA3AF" }]}>-</Text> : null}
+            <TextInput
+              ref={part.ref}
               style={[
-                styles.bedPickerItemText,
-                item === selectedValue && styles.bedPickerItemTextSelected,
+                fieldStyles.bedNumberInput,
+                {
+                  color: isDark ? "#F9FAFB" : Colors.textPrimary,
+                  borderColor: focusedPart === part.index ? Colors.secondary : isDark ? "#4B5563" : Colors.border,
+                  borderWidth: focusedPart === part.index ? 2 : 1,
+                  backgroundColor: isDark ? "#111827" : Colors.white,
+                },
               ]}
-            >
-              {item}
-            </Text>
+              value={part.value}
+              onChangeText={(text) => {
+                const cleaned = part.index === 0
+                  ? text.replace(/[^a-z]/gi, "").slice(0, 1).toUpperCase()
+                  : text.replace(/\D/g, "").slice(-1);
+                onChangePart(part.index, cleaned);
+                if (cleaned && part.index === 0) {
+                  firstDigitRef.current?.focus();
+                } else if (cleaned && part.index === 1) {
+                  secondDigitRef.current?.focus();
+                }
+              }}
+              onFocus={() => setFocusedPart(part.index)}
+              onBlur={() => setFocusedPart(null)}
+              keyboardType={part.keyboardType}
+              autoCapitalize={part.index === 0 ? "characters" : "none"}
+              maxLength={1}
+              selectTextOnFocus
+              accessibilityLabel={part.label}
+              returnKeyType={part.index < 2 ? "next" : "done"}
+            />
           </View>
-        )}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={BED_WHEEL_ITEM_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        contentContainerStyle={styles.bedPickerListContent}
-        style={styles.bedPickerList}
-      />
+        ))}
+      </View>
     </View>
   );
 }
@@ -693,19 +691,23 @@ function Field({
   iconLibrary = "material",
   keyboardType = "default",
   maxLength,
+  isDark = false,
 }: FieldProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const borderColor = isFocused ? Colors.secondary : isDark ? "#4B5563" : Colors.border;
+
   return (
     <View style={fieldStyles.wrapper}>
-      <Text style={fieldStyles.label}>{label}</Text>
-      <View style={fieldStyles.inputRow}>
+      <Text style={[fieldStyles.label, { color: borderColor, backgroundColor: isDark ? "#111827" : Colors.white }]}>{label}</Text>
+      <View style={[fieldStyles.inputRow, { borderColor, borderWidth: isFocused ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}>
         <Icon
           name={icon}
           library={iconLibrary}
           size={18}
-          color={Colors.textMuted}
+          color={isDark ? "#9CA3AF" : Colors.textMuted}
         />
         <TextInput
-          style={fieldStyles.input}
+          style={[fieldStyles.input, isDark && { color: "#F9FAFB" }]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -713,6 +715,8 @@ function Field({
           keyboardType={keyboardType}
           maxLength={maxLength}
           autoCapitalize="words"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
         />
       </View>
     </View>
@@ -722,19 +726,46 @@ function Field({
 // ── Styles ────────────────────────────────────────────────────────────
 
 const fieldStyles = StyleSheet.create({
-  wrapper: { gap: 6, paddingVertical: 4 },
+  wrapper: { position: "relative", paddingTop: 6, paddingBottom: 2 },
   label: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 12,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    position: "absolute",
+    zIndex: 1,
+    top: 0,
+    left: 12,
+    paddingHorizontal: 4,
+    backgroundColor: Colors.white,
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    minHeight: 48,
+    borderColor: Colors.border,
+    borderRadius: Radii.control,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 12,
   },
+  bedNumberWrapper: { gap: 6, paddingVertical: 2 },
+  bedNumberLabel: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 12,
+    marginLeft: 2,
+  },
+  bedNumberRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  bedNumberPart: { flexDirection: "row", alignItems: "center", gap: 8 },
+  bedNumberInput: {
+    width: 52,
+    height: 48,
+    borderRadius: Radii.control,
+    borderColor: Colors.border,
+    textAlign: "center",
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 18,
+    padding: 0,
+  },
+  bedNumberSeparator: { fontFamily: Fonts.interSemiBold, fontSize: 18, color: Colors.textMuted },
   input: {
     flex: 1,
     fontFamily: Fonts.interRegular,
@@ -746,8 +777,32 @@ const fieldStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingVertical: 10,
+    minHeight: 48,
+    borderColor: Colors.border,
+    borderRadius: Radii.control,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 12,
   },
+  dropdownMenu: {
+    maxHeight: 220,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radii.control,
+    backgroundColor: Colors.white,
+    overflow: "hidden",
+  },
+  dropdownOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  dropdownOptionText: { flex: 1 },
+  dropdownMac: { ...Typography.caption, color: Colors.textMuted },
+  dropdownEmpty: { ...Typography.caption, color: Colors.textMuted, padding: 12 },
   dropdownPlaceholder: {
     flex: 1,
     fontFamily: Fonts.interRegular,
@@ -780,11 +835,13 @@ const styles = StyleSheet.create({
     ...Typography.h2,
     color: Colors.secondaryDark,
   },
-  content: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 40 },
+  content: { padding: Spacing.xl, gap: Spacing.md, paddingBottom: 40, alignItems: "center" },
   infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+    width: "100%",
+    maxWidth: 440,
     backgroundColor: Colors.secondaryLight,
     borderRadius: Radii.control,
     padding: Spacing.md,
@@ -797,61 +854,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   formCard: {
+    width: "100%",
+    maxWidth: 440,
     backgroundColor: Colors.white,
     borderRadius: Radii.card,
-    padding: Spacing.cardPadding,
-    gap: 16,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  bedPickerRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-  },
-  bedPickerColumn: {
-    width: 76,
-  },
-  bedPickerLabel: {
-    fontFamily: Fonts.interMedium,
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  bedPickerList: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radii.control,
-    backgroundColor: Colors.backgroundNurse,
-  },
-  bedPickerListContent: {
-    paddingVertical: 36,
-  },
-  bedPickerItem: {
-    height: BED_WHEEL_ITEM_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bedPickerItemSelected: {
-    backgroundColor: Colors.secondaryLight,
-  },
-  bedPickerItemText: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 10,
-    color: Colors.textMuted,
-  },
-  bedPickerItemTextSelected: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
-    color: Colors.secondaryDark,
-  },
   divider: { height: 1, backgroundColor: Colors.border },
   submitBtn: {
+    width: "100%",
+    maxWidth: 440,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -956,12 +974,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
   datePickerOverlay: {
     flex: 1,
     justifyContent: "flex-end",
@@ -985,55 +997,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.interSemiBold,
     fontSize: 16,
     color: Colors.secondary,
-  },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "60%",
-  },
-  modalTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 18,
-    color: Colors.textPrimary,
-    marginBottom: 16,
-  },
-  modalEmptyText: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginVertical: 20,
-  },
-  modalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalItemName: {
-    fontFamily: Fonts.interMedium,
-    fontSize: 15,
-    color: Colors.textPrimary,
-  },
-  modalItemMac: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  modalCloseBtn: {
-    marginTop: 20,
-    paddingVertical: 14,
-    backgroundColor: Colors.backgroundNurse,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalCloseText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 15,
-    color: Colors.textSecondary,
   },
 });

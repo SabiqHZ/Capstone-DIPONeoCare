@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import { useTheme } from '../../context/ThemeContext';
 
 // --- Komponen SVG ---
 const HomeIcon = ({ color = "#9CA3AF", size = 24 }) => (
@@ -51,15 +52,16 @@ function TabIcon({
 }
 
 export default function ParentLayout() {
+  const { isDark } = useTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: isDark ? '#1F2937' : '#fff',
           borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
+          borderTopColor: isDark ? '#374151' : '#E5E7EB',
           height: 72,
         },
       }}

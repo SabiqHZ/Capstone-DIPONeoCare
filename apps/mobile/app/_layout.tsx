@@ -18,6 +18,7 @@ import {
 import { useAuthStore } from "../stores/auth.store";
 import { BabyProvider } from "../context/BabyContext";
 import { useNotifications } from "../hooks/useNotifications";
+import { ThemeProvider } from "../context/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -67,9 +68,11 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <BabyProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </BabyProvider>
+      <ThemeProvider>
+        <BabyProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </BabyProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

@@ -16,8 +16,10 @@ import { DailyReport, ReportHistoryItem } from "../../types";
 import { Colors } from "../../constants/colors";
 import { Typography } from "../../constants/fonts";
 import { Radii, Spacing } from "../../constants/ui";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function ReportScreen() {
+  const { isDark } = useTheme();
   const babyId = useAuthStore((s) =>
     s.user?.role === "parent" ? s.user.babyId : "",
   );
@@ -157,7 +159,7 @@ export default function ReportScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -172,9 +174,9 @@ export default function ReportScreen() {
           />
         }
       >
-        <Text style={styles.title}>Laporan Harian</Text>
+        <Text style={[styles.title, isDark && { color: "#A7F3D0" }]}>Laporan Harian</Text>
 
-        <View style={styles.datePicker}>
+        <View style={[styles.datePicker, isDark && { backgroundColor: "#1F2937" }]}>
           <TouchableOpacity
             onPress={() => goDay(-1)}
             style={styles.dateBtn}
@@ -195,7 +197,7 @@ export default function ReportScreen() {
           </TouchableOpacity>
 
           <View style={styles.dateCenter}>
-            <Text style={styles.dateText}>
+            <Text style={[styles.dateText, isDark && { color: "#F3F4F6" }]}>
               {new Date(selectedDate).toLocaleDateString("id-ID", {
                 weekday: "long",
                 day: "numeric",
@@ -263,28 +265,28 @@ export default function ReportScreen() {
         ) : (
           <>
             <View style={styles.summaryGrid}>
-              <View style={styles.summaryCard}>
+              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
                 <Text style={[styles.summaryValue, styles.sleepValue]}>
                   {formatDuration(report.totalSleepMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Tidur</Text>
               </View>
 
-              <View style={styles.summaryCard}>
+              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
                 <Text style={[styles.summaryValue, styles.awakeValue]}>
                   {formatDuration(report.totalAwakeMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Bangun</Text>
               </View>
 
-              <View style={styles.summaryCard}>
+              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
                 <Text style={[styles.summaryValue, styles.cryingValue]}>
                   {formatDuration(report.totalCryingMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Menangis</Text>
               </View>
 
-              <View style={styles.summaryCard}>
+              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
                 <Text style={styles.summaryValue}>
                   {report.totalCryingEvents}
                 </Text>
@@ -293,13 +295,13 @@ export default function ReportScreen() {
             </View>
 
             {dailyInsight ? (
-              <View style={styles.insightCard}>
+            <View style={[styles.insightCard, isDark && { backgroundColor: "#1F2937" }]}>
                 <Text style={styles.insightLabel}>Ringkasan</Text>
                 <Text style={styles.insightText}>{dailyInsight}</Text>
               </View>
             ) : null}
 
-            <View style={styles.historyCard}>
+            <View style={[styles.historyCard, isDark && { backgroundColor: "#1F2937" }]}>
               <View style={styles.historyHeader}>
                 <Text style={styles.historyTitle}>Riwayat Laporan</Text>
                 <Text style={styles.historySubtitle}>
@@ -379,7 +381,7 @@ export default function ReportScreen() {
               )}
             </View>
 
-            <View style={styles.chartCard}>
+            <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }]}>
               <Text style={styles.chartTitle}>Alokasi Aktivitas Harian</Text>
 
               <View style={styles.stackedBarContainer}>
@@ -439,7 +441,7 @@ export default function ReportScreen() {
               </View>
             </View>
 
-            <View style={styles.chartCard}>
+            <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }]}>
               <Text style={styles.chartTitle}>
                 Analisis Distribusi per Jam (00:00 - 24:00)
               </Text>

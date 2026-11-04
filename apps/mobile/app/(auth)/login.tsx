@@ -63,6 +63,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [focusedField, setFocusedField] = useState<"username" | "password" | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -110,9 +111,9 @@ export default function LoginScreen() {
 
           <View style={styles.card}>
             <View style={styles.field}>
-              <Text style={styles.label}>Nama Pengasuh</Text>
+              <Text style={[styles.label, { color: focusedField === "username" ? Colors.secondary : Colors.border }]}>Nama Pengasuh</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, focusedField === "username" && styles.inputFocused]}
                 value={username}
                 onChangeText={setUsername}
                 placeholder="Masukkan nama Pengasuh"
@@ -120,14 +121,16 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
+                onFocus={() => setFocusedField("username")}
+                onBlur={() => setFocusedField(null)}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Kata sandi</Text>
+              <Text style={[styles.label, { color: focusedField === "password" ? Colors.secondary : Colors.border }]}>Kata sandi</Text>
               <View>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, focusedField === "password" && styles.inputFocused]}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Masukkan kata sandi"
@@ -135,6 +138,8 @@ export default function LoginScreen() {
                   secureTextEntry={!showPass}
                   autoCapitalize="none"
                   editable={!isLoading}
+                  onFocus={() => setFocusedField("password")}
+                  onBlur={() => setFocusedField(null)}
                 />
                 <TouchableOpacity
                   style={styles.eyeBtn}
@@ -270,11 +275,11 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignSelf: "center",
   },
-  field: { gap: 8 },
-  label: { ...Typography.captionStrong, color: "#374151" },
+  field: { position: "relative", paddingTop: 8 },
+  label: { ...Typography.captionStrong, position: "absolute", zIndex: 1, top: 0, left: 12, paddingHorizontal: 4, backgroundColor: "#FFFFFF" },
   input: {
     borderWidth: 1,
-    borderColor: "#DDE3EB",
+    borderColor: Colors.border,
     borderRadius: 12,
     minHeight: 50,
     paddingHorizontal: 14,
@@ -284,6 +289,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     backgroundColor: "#FFFFFF",
   },
+  inputFocused: { borderWidth: 2, borderColor: Colors.secondary },
   eyeBtn: {
     position: "absolute",
     right: 14,

@@ -16,6 +16,7 @@ import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { DeviceConfig } from "../../types";
 import api from "../../services/api";
+import { useTheme } from "../../context/ThemeContext";
 
 const DEFAULT_CONFIG: DeviceConfig = {
   deviceId: "SV-DEMO01",
@@ -94,6 +95,7 @@ function SliderRow({
 }
 
 export default function DeviceConfigScreen() {
+  const { isDark } = useTheme();
   const { deviceId, babyName } = useLocalSearchParams<{
     deviceId?: string;
     babyName?: string;
@@ -204,9 +206,9 @@ export default function DeviceConfigScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerBack}
@@ -218,12 +220,12 @@ export default function DeviceConfigScreen() {
             name="arrow-back"
             library="ionicons"
             size={22}
-            color={Colors.secondaryDark}
+            color={isDark ? "#BFDBFE" : Colors.secondaryDark}
           />
         </TouchableOpacity>
         <View>
-          <Text style={styles.headerTitle}>Konfigurasi Perangkat</Text>
-          <Text style={styles.headerSub}>{babyName ?? config.deviceId}</Text>
+          <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>Konfigurasi Perangkat</Text>
+          <Text style={[styles.headerSub, isDark && { color: "#9CA3AF" }]}>{babyName ?? config.deviceId}</Text>
         </View>
         <TouchableOpacity
           onPress={handleReset}
@@ -262,9 +264,9 @@ export default function DeviceConfigScreen() {
               size={18}
               color={Colors.secondary}
             />
-            <Text style={styles.sectionTitle}>Deteksi Tangisan</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: "#BFDBFE" }]}>Deteksi Tangisan</Text>
           </View>
-          <View style={styles.card}>
+          <View style={[styles.card, isDark && { backgroundColor: "#1F2937" }]}>
             <SliderRow
               label="Durasi Minimum Tangisan"
               description="Notifikasi dikirim setelah bayi menangis selama durasi ini"
@@ -287,9 +289,9 @@ export default function DeviceConfigScreen() {
               size={18}
               color={Colors.secondary}
             />
-            <Text style={styles.sectionTitle}>Notifikasi</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: "#BFDBFE" }]}>Notifikasi</Text>
           </View>
-          <View style={styles.card}>
+          <View style={[styles.card, isDark && { backgroundColor: "#1F2937" }]}>
             <SliderRow
               label="Jeda notifikasi"
               description="Jeda minimum antar notifikasi untuk kondisi yang sama"
@@ -304,14 +306,14 @@ export default function DeviceConfigScreen() {
         </View>
 
         {/* Info */}
-        <View style={styles.infoBox}>
+        <View style={[styles.infoBox, isDark && { backgroundColor: "#1E3448" }]}>
           <Icon
             name="information-circle-outline"
             library="ionicons"
             size={16}
             color={Colors.secondary}
           />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, isDark && { color: "#BFDBFE" }]}>
             Perubahan konfigurasi berlaku segera setelah disimpan.
           </Text>
         </View>

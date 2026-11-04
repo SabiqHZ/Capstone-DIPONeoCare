@@ -55,6 +55,7 @@
         }
       ],
       "expo-font",
+      "react-native-wifi-reborn",
       [
         "expo-splash-screen",
         {

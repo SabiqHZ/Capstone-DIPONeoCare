@@ -26,6 +26,16 @@ export const authService = {
     return res.data.data as { id: string; username: string; name: string; unitId: string };
   },
 
+  updateCaregiverProfile: async (changes: {
+    name: string;
+    username: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => {
+    const res = await api.patch('/auth/nurse/profile', changes);
+    return res.data.data as { id: string; username: string; name: string; unitId: string };
+  },
+
   changeCaregiverPassword: async (currentPassword: string, newPassword: string) => {
     const res = await api.patch('/auth/nurse/password', { currentPassword, newPassword });
     return res.data as { success: boolean; message?: string };
