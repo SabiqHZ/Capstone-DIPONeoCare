@@ -25,7 +25,8 @@ import { useTheme } from "../../context/ThemeContext";
 
 // Kita menggunakan Fetch API bawaan agar tidak terikat aturan Axios (seperti interceptor token)
 // Karena saat konek ke ESP32, kita sedang offline dari internet dan tidak butuh JWT.
-const ESP32_SETUP_URL = "http://192.168.4.1/setup";
+const ESP32_PORTAL_URL = "http://192.168.4.1/";
+const ESP32_CONNECT_URL = "http://192.168.4.1/connect";
 
 export default function DeviceSetupScreen() {
   const router = useRouter();
@@ -135,7 +136,7 @@ export default function DeviceSetupScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetch(ESP32_SETUP_URL);
+      await fetch(ESP32_PORTAL_URL);
     } catch {
       Alert.alert(
         "Koneksi Gagal",
@@ -157,17 +158,16 @@ export default function DeviceSetupScreen() {
 
     setIsLoading(true);
     try {
-      // Mengirim POST ke web server lokal di dalam ESP32
-      const response = await fetch(ESP32_SETUP_URL, {
+      // Firmware menerima form-urlencoded di POST /connect, bukan JSON di /setup.
+      const formBody =
+        `ssid=${encodeURIComponent(ssid.trim())}` +
+        `&password=${encodeURIComponent(password)}`;
+      const response = await fetch(ESP32_CONNECT_URL, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        // Sesuaikan key JSON ini dengan apa yang ESP32 C++ milikmu harapkan!
-        body: JSON.stringify({
-          ssid: ssid.trim(),
-          password: password,
-        }),
+        body: formBody,
       });
 
       if (response.ok) {

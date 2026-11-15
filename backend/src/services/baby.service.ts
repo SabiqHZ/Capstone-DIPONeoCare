@@ -75,6 +75,7 @@ export const babyService = {
     dateOfBirth: string;
     parentName: string;
     unitId: string;
+    deviceId: string;
   }) {
     // Generate kode unik, pastikan tidak duplikat
     let uniqueCode = generateUniqueCode();
@@ -108,6 +109,21 @@ export const babyService = {
       .single();
 
     if (error) throw new Error(error.message);
+
+    const { data: pairedDevice, error: pairError } = await supabaseAdmin
+      .from("devices")
+      .update({ baby_id: data.id, unit_id: payload.unitId })
+      .eq("id", payload.deviceId)
+      .is("baby_id", null)
+      .or(`unit_id.eq.${payload.unitId},unit_id.is.null`)
+      .select("id")
+      .maybeSingle();
+
+    if (pairError || !pairedDevice) {
+      await supabaseAdmin.from("babies").delete().eq("id", data.id);
+      throw new Error(pairError?.message ?? "Kamera tidak tersedia atau sudah dipasangkan");
+    }
+
     return {
       id: data.id,
       name: data.name,
@@ -115,7 +131,7 @@ export const babyService = {
       dateOfBirth: data.date_of_birth,
       parentName: data.parent_name,
       uniqueCode: data.unique_code,
-      deviceId: null,
+      deviceId: pairedDevice.id,
       unitId: data.unit_id,
       createdAt: data.created_at,
     };
@@ -137,6 +153,25 @@ export const babyService = {
 
     if (error) throw new Error(error.message);
     return { success: true };
+  },
+  async updateBaby(babyId: string, unitId: string, changes: {
+    name: string; bedNumber: string; dateOfBirth: string; parentName: string;
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from("babies")
+      .update({
+        name: changes.name.trim(),
+        bed_number: changes.bedNumber.trim(),
+        date_of_birth: changes.dateOfBirth,
+        parent_name: changes.parentName.trim(),
+      })
+      .eq("id", babyId)
+      .eq("unit_id", unitId)
+      .select("id, name, bed_number, date_of_birth, parent_name, unique_code, unit_id, created_at")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Bayi tidak ditemukan atau bukan bagian dari unit pengasuh");
+    return data;
   },
   async dischargeBaby(babyId: string, nurseUnitId: string) {
     const { data: baby, error: babyError } = await supabaseAdmin

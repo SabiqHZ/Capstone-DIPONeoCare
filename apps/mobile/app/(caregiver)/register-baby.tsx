@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   Modal,
   Platform,
   TextInputInstance,
-  RefreshControl,
 } from "react-native";
 import DateTimePicker, {
   DateTimePickerAndroid,
@@ -23,7 +22,6 @@ import { Colors } from "../../constants/colors";
 import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { babyService } from "../../services/baby.service";
-import api from "../../services/api"; // Pastikan path ini benar sesuai strukturmu
 import { RegisteredBaby } from "../../types";
 import { SuccessModal } from "../../components/ui/SuccessModal";
 import { useTheme } from "../../context/ThemeContext";
@@ -33,13 +31,6 @@ interface BabyForm {
   bedNumber: string;
   dateOfBirth: string;
   parentName: string;
-  deviceId: string; // Tambahan state untuk kamera
-}
-
-interface Device {
-  id: string;
-  mac_address: string;
-  name: string;
 }
 const formatDateInput = (date: Date): string => {
   const day = String(date.getDate()).padStart(2, "0");
@@ -96,57 +87,38 @@ export default function RegisterBabyScreen() {
     bedNumber: "A-00",
     dateOfBirth: "",
     parentName: "",
-    deviceId: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [registeredBaby, setRegisteredBaby] = useState<RegisteredBaby | null>(
     null,
   );
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
-  const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
-  const [focusedField, setFocusedField] = useState<"date" | "camera" | null>(
-    null,
-  );
+  const [focusedField, setFocusedField] = useState<"date" | null>(null);
 
-  // State untuk Dropdown Kamera
-  const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
-  const [isLoadingDevices, setIsLoadingDevices] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const update = (key: keyof BabyForm, val: string) =>
+    setForm((f) => ({ ...f, [key]: val }));
 
-  // Fetch daftar kamera yang nganggur saat halaman dimuat
-  useEffect(() => {
-    fetchAvailableDevices();
-  }, []);
-
-  const fetchAvailableDevices = async () => {
+  const loadAvailableDevices = async () => {
     setIsLoadingDevices(true);
     try {
+      const { api } = await import("../../services/api");
       const response = await api.get("/devices/available");
-      if (response.data.success) {
-        setAvailableDevices(response.data.data);
-      }
+      setAvailableDevices(response.data.data ?? []);
     } catch (error) {
-      console.error("Gagal mengambil daftar kamera:", error);
-      Alert.alert("Gagal", "Tidak dapat memuat daftar kamera.");
+      console.error("Gagal memuat kamera tersedia:", error);
+      setAvailableDevices([]);
     } finally {
       setIsLoadingDevices(false);
     }
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await fetchAvailableDevices();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const update = (key: keyof BabyForm, val: string) =>
-    setForm((f) => ({ ...f, [key]: val }));
+  useEffect(() => { void loadAvailableDevices(); }, []);
 
   const updateBedPart = (part: 0 | 1 | 2, value: string) =>
     setForm((current) => {
@@ -199,14 +171,11 @@ export default function RegisterBabyScreen() {
     /^[A-Z]-\d{2}$/.test(form.bedNumber) &&
     form.dateOfBirth.trim() !== "" &&
     form.parentName.trim() !== "" &&
-    form.deviceId !== ""; // Wajib pilih kamera
+    selectedDeviceId !== "";
 
   const handleSubmit = async () => {
-    if (!isValid) {
-      Alert.alert(
-        "Lengkapi Data",
-        "Semua data termasuk pilihan kamera wajib diisi.",
-      );
+    if (!isValid || !selectedDeviceId) {
+      Alert.alert("Lengkapi Data", "Semua data wajib diisi.");
       return;
     }
 
@@ -229,10 +198,8 @@ export default function RegisterBabyScreen() {
         bedNumber: form.bedNumber.trim(),
         dateOfBirth: apiDate,
         parentName: form.parentName.trim(),
+        deviceId: selectedDeviceId,
       });
-
-      // 2. Pair Perangkat secara otomatis
-      await babyService.pairDevice(baby.id, form.deviceId);
 
       // Tandai sukses
       setRegisteredBaby(baby);
@@ -276,7 +243,7 @@ export default function RegisterBabyScreen() {
             <Text style={styles.codeLabel}>KODE AKSES ORANG TUA</Text>
             <Text style={styles.codeValue}>{registeredBaby.uniqueCode}</Text>
             <Text style={styles.codeNote}>
-              Kode berlaku selama pasien dirawat
+              Kode berlaku selama bayi dirawat
             </Text>
           </View>
 
@@ -312,20 +279,6 @@ export default function RegisterBabyScreen() {
                 Tempat Tidur {registeredBaby.bedNumber}
               </Text>
             </View>
-            <View style={styles.babyInfoRow}>
-              <Icon
-                name="videocam-outline"
-                library="ionicons"
-                size={20}
-                color={Colors.textMuted}
-              />
-              <Text
-                style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}
-              >
-                {availableDevices.find((d) => d.id === form.deviceId)?.name ||
-                  "Kamera Terhubung"}
-              </Text>
-            </View>
           </View>
 
           <TouchableOpacity
@@ -337,9 +290,7 @@ export default function RegisterBabyScreen() {
                 bedNumber: "A-00",
                 dateOfBirth: "",
                 parentName: "",
-                deviceId: "",
               });
-              fetchAvailableDevices(); // Refresh list kamera
             }}
           >
             <Icon
@@ -360,8 +311,8 @@ export default function RegisterBabyScreen() {
         </ScrollView>
         <SuccessModal
           visible={isSuccessModalVisible}
-          title="Bayi dan kamera berhasil ditambahkan"
-          message="Data bayi telah disimpan dan kamera berhasil dihubungkan ke sistem."
+          title="Bayi berhasil didaftarkan"
+          message="Data bayi telah disimpan. Kamera dapat dikonfigurasi nanti."
           buttonLabel="Lihat detail"
           onClose={() => setIsSuccessModalVisible(false)}
         />
@@ -404,30 +355,7 @@ export default function RegisterBabyScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            colors={[Colors.secondary]}
-            tintColor={Colors.secondary}
-          />
-        }
       >
-        <View
-          style={[styles.infoBox, isDark && { backgroundColor: "#1E3448" }]}
-        >
-          <Icon
-            name="information-circle-outline"
-            library="ionicons"
-            size={18}
-            color={Colors.secondary}
-          />
-          <Text style={[styles.infoText, isDark && { color: "#BFDBFE" }]}>
-            Pilih kamera yang belum terpakai untuk memantau bayi secara
-            otomatis.
-          </Text>
-        </View>
-
         <View
           style={[styles.formCard, isDark && { backgroundColor: "#1F2937" }]}
         >
@@ -440,6 +368,16 @@ export default function RegisterBabyScreen() {
             iconLibrary="material"
             isDark={isDark}
           />
+          <View style={styles.divider} />
+          <View style={{ gap: 10 }}>
+            <Text style={[Typography.body, { color: Colors.textPrimary, fontFamily: Fonts.interSemiBold }, isDark && { color: "#F9FAFB" }]}>Pilih Kamera (wajib)</Text>
+            {isLoadingDevices ? <ActivityIndicator color={Colors.secondary} /> : availableDevices.length ? availableDevices.map((device) => (
+              <TouchableOpacity key={device.id} onPress={() => setSelectedDeviceId(device.id)} style={{ minHeight: 48, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: selectedDeviceId === device.id ? Colors.secondary : Colors.border, backgroundColor: selectedDeviceId === device.id ? Colors.secondaryLight : isDark ? "#111827" : Colors.white }} accessibilityRole="radio" accessibilityState={{ selected: selectedDeviceId === device.id }}>
+                <Text style={{ color: isDark ? "#F9FAFB" : Colors.textPrimary }}>{device.name || device.mac_address}{device.is_online ? " · Aktif" : " · Tidak aktif"}</Text>
+              </TouchableOpacity>
+            )) : <Text style={[Typography.caption, { color: Colors.textMuted }]}>Tidak ada kamera yang tersedia. Pastikan kamera sudah mengirim heartbeat, lalu muat ulang halaman.</Text>}
+            <TouchableOpacity onPress={() => void loadAvailableDevices()} style={{ minHeight: 44, justifyContent: "center" }} accessibilityRole="button" accessibilityLabel="Muat ulang daftar kamera"><Text style={{ color: Colors.secondary }}>Muat ulang kamera</Text></TouchableOpacity>
+          </View>
           <View style={styles.divider} />
           <BedNumberField
             value={form.bedNumber}
@@ -511,146 +449,6 @@ export default function RegisterBabyScreen() {
             isDark={isDark}
           />
           <View style={styles.divider} />
-
-          {/* Custom Dropdown untuk Pilih Kamera */}
-          <View style={fieldStyles.wrapper}>
-            <Text
-              style={[
-                fieldStyles.label,
-                {
-                  color: isDeviceDropdownOpen
-                    ? Colors.secondary
-                    : isDark
-                      ? "#4B5563"
-                      : Colors.border,
-                  backgroundColor: isDark ? "#111827" : Colors.white,
-                },
-              ]}
-            >
-              Pilih Kamera Pemantau
-            </Text>
-            <TouchableOpacity
-              style={[
-                fieldStyles.dropdownButton,
-                {
-                  borderColor: isDeviceDropdownOpen
-                    ? Colors.secondary
-                    : isDark
-                      ? "#4B5563"
-                      : Colors.border,
-                  borderWidth: isDeviceDropdownOpen ? 2 : 1,
-                },
-                isDark && { backgroundColor: "#111827" },
-              ]}
-              onPress={() => setIsDeviceDropdownOpen((open) => !open)}
-              disabled={isLoadingDevices}
-              accessibilityRole="button"
-              accessibilityState={{
-                expanded: isDeviceDropdownOpen,
-                disabled: isLoadingDevices,
-              }}
-            >
-              <Icon
-                name="videocam-outline"
-                library="ionicons"
-                size={18}
-                color={Colors.textMuted}
-              />
-              <Text
-                style={
-                  form.deviceId
-                    ? [
-                        fieldStyles.dropdownSelectedText,
-                        isDark && { color: "#F9FAFB" },
-                      ]
-                    : [
-                        fieldStyles.dropdownPlaceholder,
-                        isDark && { color: "#9CA3AF" },
-                      ]
-                }
-              >
-                {isLoadingDevices
-                  ? "Memuat kamera..."
-                  : form.deviceId
-                    ? availableDevices.find((d) => d.id === form.deviceId)?.name
-                    : availableDevices.length === 0
-                      ? "Tidak ada kamera tersedia"
-                      : "Pilih Kamera..."}
-              </Text>
-              <Icon
-                name={isDeviceDropdownOpen ? "chevron-up" : "chevron-down"}
-                library="ionicons"
-                size={18}
-                color={Colors.textMuted}
-              />
-            </TouchableOpacity>
-            {isDeviceDropdownOpen ? (
-              <ScrollView
-                style={[
-                  fieldStyles.dropdownMenu,
-                  isDark && {
-                    backgroundColor: "#111827",
-                    borderColor: "#4B5563",
-                  },
-                ]}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator
-              >
-                {availableDevices.length === 0 ? (
-                  <Text
-                    style={[
-                      fieldStyles.dropdownEmpty,
-                      isDark && { color: "#9CA3AF" },
-                    ]}
-                  >
-                    Semua kamera sedang digunakan. Tambahkan perangkat baru
-                    terlebih dahulu.
-                  </Text>
-                ) : (
-                  availableDevices.map((device) => (
-                    <TouchableOpacity
-                      key={device.id}
-                      style={[
-                        fieldStyles.dropdownOption,
-                        isDark && { borderBottomColor: "#374151" },
-                      ]}
-                      onPress={() => {
-                        update("deviceId", device.id);
-                        setIsDeviceDropdownOpen(false);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Pilih kamera ${device.name}`}
-                    >
-                      <Icon
-                        name="videocam-outline"
-                        library="ionicons"
-                        size={18}
-                        color={Colors.secondary}
-                      />
-                      <View style={fieldStyles.dropdownOptionText}>
-                        <Text
-                          style={[
-                            fieldStyles.dropdownSelectedText,
-                            isDark && { color: "#F9FAFB" },
-                          ]}
-                        >
-                          {device.name}
-                        </Text>
-                        <Text
-                          style={[
-                            fieldStyles.dropdownMac,
-                            isDark && { color: "#9CA3AF" },
-                          ]}
-                        >
-                          {device.mac_address}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            ) : null}
-          </View>
         </View>
 
         <TouchableOpacity

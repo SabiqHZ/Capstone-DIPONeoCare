@@ -109,6 +109,8 @@ export interface DailyReport {
   totalCryingMinutes: number;
   totalCryingSeconds: number;
   totalCryingEvents: number;
+  totalAnomalyEvents: number;
+  anomalyEventCounts: Record<string, number>;
   hourlyActivities: HourlyActivityData[];
 }
 export interface ReportHistoryItem {

@@ -64,6 +64,7 @@
         }
       ],
       "react-native-wifi-reborn",
+      "./plugins/withWifiRebornGradleFix",
       [
         "expo-splash-screen",
         {

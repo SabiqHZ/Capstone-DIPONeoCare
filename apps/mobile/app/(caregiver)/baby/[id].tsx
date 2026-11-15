@@ -22,6 +22,7 @@ import { Fonts, Typography } from "../../../constants/fonts";
 import { Radii, Spacing } from "../../../constants/ui";
 import { AlertBanner } from "../../../components/ui/AlertBanner";
 import { StatusBadge } from "../../../components/ui/StatusBadge";
+import { SuccessModal } from "../../../components/ui/SuccessModal";
 import { babyService } from "../../../services/baby.service";
 import { deviceService } from "../../../services/device.service";
 import {
@@ -81,6 +82,7 @@ export default function BabyDetailScreen() {
   const [isDischargeConfirmVisible, setIsDischargeConfirmVisible] =
     useState(false);
   const [isDischarging, setIsDischarging] = useState(false);
+  const [isCopySuccessVisible, setIsCopySuccessVisible] = useState(false);
 
   const realtimeStatus = useBabyStatusById(id ?? "");
   const allAlerts = useActiveAlerts();
@@ -272,7 +274,7 @@ export default function BabyDetailScreen() {
     try {
       await babyService.dischargeBaby(id);
       setIsDischargeConfirmVisible(false);
-      Alert.alert("Sukses", "Pasien berhasil dikeluarkan dari sistem.", [
+      Alert.alert("Sukses", "Bayi berhasil dikeluarkan dari sistem.", [
         {
           text: "Baik",
           onPress: () => router.replace("/(caregiver)/dashboard"),
@@ -280,7 +282,7 @@ export default function BabyDetailScreen() {
       ]);
     } catch (err: any) {
       console.error(
-        "[BabyDetail] Gagal mengeluarkan pasien:",
+        "[BabyDetail] Gagal mengeluarkan bayi:",
         err.response?.data || err,
       );
       setIsDischargeConfirmVisible(false);
@@ -447,27 +449,42 @@ export default function BabyDetailScreen() {
               label="Kode Orang Tua"
               value={baby.unique_code}
               mono
+              onPress={async () => {
+                if (!baby.unique_code) return;
+                await Clipboard.setStringAsync(baby.unique_code);
+                setIsCopySuccessVisible(true);
+              }}
+              accessibilityLabel={`Kode orang tua ${baby.unique_code}`}
+              accessibilityHint="Ketuk untuk menyalin kode orang tua"
             />
             <InfoItem
               icon="time-outline"
               label="Terdaftar"
-              value={new Date(baby.created_at).toLocaleDateString("id-ID")}
+              value={new Date(baby.created_at).toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
             />
           </View>
           <TouchableOpacity
-            style={styles.copyParentCodeButton}
-            onPress={async () => {
-              if (!baby.unique_code) return;
-              await Clipboard.setStringAsync(baby.unique_code);
-              Alert.alert("Kode disalin", "Kode akses orang tua berhasil disalin.");
-            }}
-            activeOpacity={0.75}
+            style={styles.editBabyButton}
+            onPress={() =>
+              router.push({
+                pathname: "/(caregiver)/baby-edit",
+                params: { babyId: baby.id },
+              })
+            }
             accessibilityRole="button"
-            accessibilityLabel="Salin kode akses orang tua"
-            accessibilityHint="Menyalin kode agar dapat dibagikan kepada orang tua"
+            accessibilityLabel="Edit informasi bayi"
           >
-            <Icon name="copy-outline" library="ionicons" size={17} color={Colors.secondaryDark} />
-            <Text style={styles.copyParentCodeText}>Salin kode orang tua</Text>
+            <Icon
+              name="create-outline"
+              library="ionicons"
+              size={17}
+              color={Colors.secondaryDark}
+            />
+            <Text style={styles.copyParentCodeText}>Edit informasi bayi</Text>
           </TouchableOpacity>
         </View>
 
@@ -768,7 +785,7 @@ export default function BabyDetailScreen() {
               size={18}
               color={Colors.critical}
             />
-            <Text style={styles.dischargeBtnText}>Keluarkan Pasien</Text>
+            <Text style={styles.dischargeBtnText}>Keluarkan Bayi</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -802,7 +819,7 @@ export default function BabyDetailScreen() {
           <View
             style={styles.confirmCard}
             accessibilityViewIsModal
-            accessibilityLabel="Konfirmasi keluarkan pasien"
+            accessibilityLabel="Konfirmasi keluarkan bayi"
           >
             <View style={styles.confirmIcon}>
               <Icon
@@ -812,7 +829,7 @@ export default function BabyDetailScreen() {
                 color={Colors.critical}
               />
             </View>
-            <Text style={styles.confirmTitle}>Keluarkan Pasien</Text>
+            <Text style={styles.confirmTitle}>Keluarkan Bayi</Text>
             <Text style={styles.confirmMessage}>
               Yakin ingin mengeluarkan {baby?.name} dari sistem? Kamera yang
               terhubung akan dilepas dari bayi ini.
@@ -842,6 +859,13 @@ export default function BabyDetailScreen() {
           </View>
         </View>
       </Modal>
+      <SuccessModal
+        visible={isCopySuccessVisible}
+        title="Kode disalin"
+        message="Kode akses orang tua berhasil disalin."
+        buttonLabel="Tutup"
+        onClose={() => setIsCopySuccessVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -877,9 +901,21 @@ function InfoItem({
   label,
   value,
   mono = false,
-}: any) {
-  return (
-    <View style={infoStyles.wrapper}>
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+}: {
+  icon: string;
+  iconLib?: "ionicons" | "material" | "feather";
+  label: string;
+  value: string;
+  mono?: boolean;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+}) {
+  const content = (
+    <>
       <View style={infoStyles.labelRow}>
         <Icon
           name={icon}
@@ -895,8 +931,25 @@ function InfoItem({
       >
         {value}
       </Text>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={infoStyles.wrapper}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={infoStyles.wrapper}>{content}</View>;
 }
 
 const infoStyles = StyleSheet.create({
@@ -1093,6 +1146,18 @@ const styles = StyleSheet.create({
   },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   copyParentCodeButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: Radii.control,
+    borderWidth: 1,
+    borderColor: Colors.secondaryLight,
+    backgroundColor: Colors.secondaryLight,
+  },
+  editBabyButton: {
     alignSelf: "flex-start",
     minHeight: 44,
     flexDirection: "row",

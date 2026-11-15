@@ -17,6 +17,7 @@ export const babyService = {
     bedNumber: string;
     dateOfBirth: string;
     parentName: string;
+    deviceId: string;
   }): Promise<RegisteredBaby> => {
     const res = await api.post("/babies", payload);
     return res.data.data;
@@ -24,6 +25,10 @@ export const babyService = {
 
   pairDevice: async (babyId: string, deviceId: string): Promise<void> => {
     await api.post("/babies/pair", { babyId, deviceId });
+  },
+  updateBaby: async (babyId: string, payload: { name: string; bedNumber: string; dateOfBirth: string; parentName: string }) => {
+    const response = await api.patch(`/babies/${babyId}`, payload);
+    return response.data.data;
   },
   dischargeBaby: async (babyId: string): Promise<void> => {
     await api.delete(`/babies/${babyId}`);

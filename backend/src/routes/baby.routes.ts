@@ -12,6 +12,7 @@ router.use(authMiddleware);
 router.get("/", requireRole("nurse"), babyController.getBabies);
 router.post("/", requireRole("nurse"), babyController.registerBaby);
 router.post("/pair", requireRole("nurse"), babyController.pairDevice);
+router.patch("/:id", requireRole("nurse"), babyController.updateBaby);
 
 router.delete("/:id", requireRole("nurse"), babyController.dischargeBaby);
 // Nurse & Parent

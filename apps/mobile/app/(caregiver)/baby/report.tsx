@@ -25,6 +25,8 @@ interface DailyReport {
   totalAwakeMinutes: number;
   totalCryingMinutes: number;
   totalCryingEvents: number;
+  totalAnomalyEvents: number;
+  anomalyEventCounts: Record<string, number>;
   hourlyActivities: {
     hour: number;
     sleepMinutes: number;
@@ -117,10 +119,13 @@ export default function NurseBabyReportScreen() {
 
   // Helper untuk format menit ke Jam & Menit
   const formatDuration = (minutes: number) => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h > 0) return `${h}j ${m}m`;
-    return `${m}m`;
+    const totalSeconds = Math.round(minutes * 60);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}j ${m}m ${s}d`;
+    if (m > 0) return s > 0 ? `${m}m ${s}d` : `${m}m`;
+    return `${s}d`;
   };
 
   return (
@@ -284,6 +289,14 @@ export default function NurseBabyReportScreen() {
                 </Text>
                 <Text style={styles.summaryLabel}>Total Menangis</Text>
               </View>
+            </View>
+
+            <View style={[styles.card, { padding: 16, gap: 6 }]}>
+              <Text style={styles.cardTitle}>Anomali terdeteksi</Text>
+              <Text style={styles.summaryVal}>{report.totalAnomalyEvents ?? 0} kejadian</Text>
+              {Object.entries(report.anomalyEventCounts ?? {}).map(([type, count]) => (
+                <Text key={type} style={styles.legendText}>{type}: {count}x</Text>
+              ))}
             </View>
 
             <View style={styles.historyCard}>
@@ -460,7 +473,9 @@ export default function NurseBabyReportScreen() {
                             style={{ flex: Math.max(0, 60 - totalRecorded) }}
                           />
                         </View>
-                        <Text style={styles.barVal}>{totalRecorded}m</Text>
+                        <Text style={styles.barVal}>
+                          {Math.round(totalRecorded)}/60
+                        </Text>
                       </View>
                     );
                   })
@@ -675,7 +690,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.interRegular,
     fontSize: 10,
     color: Colors.textDisabled,
-    width: 28,
+    width: 36,
     textAlign: "right",
   },
   noData: {

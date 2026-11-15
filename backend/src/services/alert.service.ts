@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { JwtPayload, AlertLevel } from "../types";
+import { pushNotificationService } from "./push-notification.service";
 
 export const alertService = {
   async createAlert(payload: {
@@ -24,6 +25,10 @@ export const alertService = {
       console.error("[Alert] Gagal menyimpan alert:", error.message);
       return null;
     }
+
+    void pushNotificationService
+      .sendAlert(payload.babyId, payload.severity === "critical" ? "Peringatan" : "Perhatian", payload.message, payload.severity)
+      .catch((pushError) => console.error("[Push] Gagal mengirim alert:", pushError.message));
 
     return data;
   },

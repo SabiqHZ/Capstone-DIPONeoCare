@@ -416,6 +416,14 @@ export default function ReportScreen() {
               </View>
             </View>
 
+            <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }, { padding: 16 }]}>
+              <Text style={styles.chartTitle}>Anomali terdeteksi</Text>
+              <Text style={styles.chartSubtitle}>{report.totalAnomalyEvents ?? 0} kejadian pada tanggal ini</Text>
+              {Object.entries(report.anomalyEventCounts ?? {}).map(([type, count]) => (
+                <Text key={type} style={styles.legendText}>{type}: {count}x</Text>
+              ))}
+            </View>
+
             <View
               style={[
                 styles.historyCard,

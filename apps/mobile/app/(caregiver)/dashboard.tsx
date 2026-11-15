@@ -242,8 +242,6 @@ function BabyCard({
 
         {faceCovered ? (
           <Text style={styles.faceWarning}>⚠ Wajah tertutup</Text>
-        ) : activityKey === "unknown" ? (
-          <Text style={styles.faceWarning}>Wajah: Tidak ada bayi yang terdeteksi</Text>
         ) : null}
       </View>
     </TouchableOpacity>

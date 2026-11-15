@@ -81,6 +81,7 @@ export default function ParentDashboard() {
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAlertsVisible, setIsAlertsVisible] = useState(false);
 
   const [faceAnomalyDismissed, setFaceAnomalyDismissed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -314,6 +315,16 @@ export default function ParentDashboard() {
 
           <View style={styles.headerRight}>
             <TouchableOpacity
+              style={styles.parentHeaderIconBtn}
+              onPress={() => setIsAlertsVisible(true)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Notifikasi${alerts.length ? `, ${alerts.length} belum ditangani` : ""}`}
+            >
+              <Icon name="notifications-outline" library="ionicons" size={25} color={Colors.textPrimary} />
+              {alerts.length > 0 ? <View style={styles.parentBellDot} /> : null}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.logoutBtn}
               onPress={handleLogout}
               activeOpacity={0.7}
@@ -423,40 +434,25 @@ export default function ParentDashboard() {
             ALERTS
         ====================================================== */}
 
-        {visibleAlerts.length > 0 ? (
-          <View style={styles.alertSection}>
-            <View style={styles.sectionHeader}>
-              <Text
-                style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}
-              >
-                Perlu perhatian
-              </Text>
-
-              <Text style={styles.alertCount}>{visibleAlerts.length}</Text>
-            </View>
-
-            <View style={styles.alertList}>
-              {visibleAlerts.map((alert) => (
-                <AlertBanner
-                  key={alert.id}
-                  message={alert.message}
-                  severity={alert.severity}
-                  time={new Date(alert.timestamp).toLocaleTimeString("id-ID")}
-                  onDismiss={async () => {
-                    try {
-                      await acknowledgeAlert(alert.id);
-                    } catch {
-                      Alert.alert(
-                        "Gagal",
-                        "Peringatan belum dapat ditandai sebagai sudah ditangani.",
-                      );
-                    }
-                  }}
-                />
+        <Modal visible={isAlertsVisible} transparent animationType="fade" onRequestClose={() => setIsAlertsVisible(false)}>
+          <Pressable style={styles.parentAlertsOverlay} onPress={() => setIsAlertsVisible(false)}>
+            <Pressable style={[styles.parentAlertsCard, isDark && { backgroundColor: "#1F2937" }]} onPress={() => {}}>
+              <View style={styles.parentAlertsHeader}>
+                <Text style={[styles.sectionTitle, isDark && { color: "#F9FAFB" }]}>Notifikasi</Text>
+                <TouchableOpacity onPress={() => setIsAlertsVisible(false)} accessibilityRole="button" accessibilityLabel="Tutup notifikasi">
+                  <Icon name="close" library="ionicons" size={22} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              {visibleAlerts.length === 0 ? (
+                <Text style={[styles.lastUpdated, isDark && { color: "#D1D5DB" }]}>Tidak ada notifikasi baru.</Text>
+              ) : visibleAlerts.map((alert) => (
+                <AlertBanner key={alert.id} message={alert.message} severity={alert.severity} time={new Date(alert.timestamp).toLocaleTimeString("id-ID")} onDismiss={async () => {
+                  try { await acknowledgeAlert(alert.id); } catch { Alert.alert("Gagal", "Peringatan belum dapat ditandai sebagai sudah ditangani."); }
+                }} />
               ))}
-            </View>
-          </View>
-        ) : null}
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* =====================================================
             FACE ANOMALY
@@ -700,10 +696,10 @@ export default function ParentDashboard() {
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Terdaftar</Text>
-                  <Text style={styles.infoValue}>
-                    {new Date(babyProfile.created_at).toLocaleDateString(
-                      "id-ID",
-                    )}
+                      <Text style={styles.infoValue}>
+                    {new Date(babyProfile.created_at).toLocaleDateString("id-ID", {
+                      weekday: "long", day: "numeric", month: "long", year: "numeric",
+                    })}
                   </Text>
                 </View>
               </View>
@@ -885,6 +881,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  parentHeaderIconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", position: "relative" },
+  parentBellDot: { position: "absolute", top: 8, right: 8, width: 9, height: 9, borderRadius: 5, backgroundColor: Colors.critical },
+  parentAlertsOverlay: { flex: 1, backgroundColor: "rgba(17,24,39,0.45)", justifyContent: "flex-start", alignItems: "flex-end", paddingTop: 96, paddingHorizontal: 16 },
+  parentAlertsCard: { width: "100%", maxWidth: 380, maxHeight: "70%", backgroundColor: Colors.white, borderRadius: 16, padding: 16, gap: 12, elevation: 8 },
+  parentAlertsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   logoutOverlay: {
     flex: 1,
     alignItems: "center",

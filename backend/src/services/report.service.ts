@@ -51,6 +51,19 @@ async function buildDailyReport(babyId: string, date: string) {
 
   if (error) throw new Error(error.message);
 
+  const { data: anomalyRows, error: anomalyError } = await supabaseAdmin
+    .from('anomaly_events')
+    .select('anomaly_type')
+    .eq('baby_id', babyId)
+    .gte('started_at', startOfDay.toISOString())
+    .lt('started_at', endOfDay.toISOString());
+
+  if (anomalyError) throw new Error(anomalyError.message);
+  const anomalyEventCounts = (anomalyRows ?? []).reduce<Record<string, number>>((counts, row) => {
+    counts[row.anomaly_type] = (counts[row.anomaly_type] ?? 0) + 1;
+    return counts;
+  }, {});
+
   const hourlyActivities: HourlyActivity[] = Array.from({ length: 24 }, (_, hour) => ({
     hour,
     sleepSeconds: 0,
@@ -101,6 +114,8 @@ async function buildDailyReport(babyId: string, date: string) {
     totalAwakeMinutes: secondsToMinutes(totals.awakeSeconds),
     totalCryingMinutes: secondsToMinutes(totals.cryingSeconds),
     totalCryingEvents: cryingEvents,
+    totalAnomalyEvents: (anomalyRows ?? []).length,
+    anomalyEventCounts,
     hourlyActivities: hourlyActivities.map((hour) => ({
       ...hour,
       sleepMinutes: secondsToMinutes(hour.sleepSeconds),

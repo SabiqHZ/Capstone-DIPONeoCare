@@ -35,10 +35,10 @@ export const babyController = {
 
   async registerBaby(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { name, bedNumber, dateOfBirth, parentName } = req.body;
+      const { name, bedNumber, dateOfBirth, parentName, deviceId } = req.body;
       const unitId = req.user?.unitId;
 
-      if (!name || !bedNumber || !dateOfBirth || !parentName || !unitId) {
+      if (!name || !bedNumber || !dateOfBirth || !parentName || !deviceId || !unitId) {
         res
           .status(400)
           .json({ success: false, error: "Semua field wajib diisi" });
@@ -50,6 +50,7 @@ export const babyController = {
         bedNumber,
         dateOfBirth,
         parentName,
+        deviceId,
         unitId,
       });
 
@@ -70,6 +71,21 @@ export const babyController = {
     } catch (err: any) {
       const response: ApiResponse = { success: false, error: err.message };
       res.status(500).json(response);
+    }
+  },
+  async updateBaby(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { name, bedNumber, dateOfBirth, parentName } = req.body;
+      const unitId = req.user?.unitId;
+      if (!unitId || ![name, bedNumber, dateOfBirth, parentName].every((value) => typeof value === "string" && value.trim())) {
+        res.status(400).json({ success: false, error: "Data bayi wajib diisi" });
+        return;
+      }
+      const data = await babyService.updateBaby(req.params.id as string, unitId, { name, bedNumber, dateOfBirth, parentName });
+      res.json({ success: true, data });
+    } catch (err: any) {
+      const status = err.message.includes("tidak ditemukan") ? 404 : 500;
+      res.status(status).json({ success: false, error: err.message });
     }
   },
   async dischargeBaby(req: AuthRequest, res: Response): Promise<void> {
