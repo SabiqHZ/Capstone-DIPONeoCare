@@ -229,7 +229,7 @@ export const deviceService = {
       flags: ActivityFlags;
       cryingDurationSec: number;
       alertLevel: string;
-      soundClass: "crying" | "not_crying";
+      soundClass: "crying" | "not_crying" | null;
       soundConfidence: number;
       cryingClass: "hungry" | "pain" | "discomfort" | null;
       anomalyType: string | null;
@@ -295,7 +295,7 @@ export const deviceService = {
         crying_class: payload.cryingClass,
         recorded_at: payload.recordedAt,
       },
-      { onConflict: "baby_id,recorded_at", ignoreDuplicates: true },
+      { onConflict: "baby_id,recorded_at" },
     );
     if (error) throw new Error(error.message);
   },

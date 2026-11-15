@@ -1,7 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { CONFIG } from '../constants/config';
-import { useAuthStore } from '../stores/auth.store'; 
+import { authStorage, useAuthStore } from '../stores/auth.store';
 
 const api = axios.create({
   baseURL: `${CONFIG.API_URL}/api`,
@@ -11,7 +10,7 @@ const api = axios.create({
 
 api.interceptors.request.use(async (config) => {
 
-  const tokenString = await SecureStore.getItemAsync('sv_user');
+  const tokenString = await authStorage.getItem('sv_user');
   if (tokenString) {
     try {
       const user = JSON.parse(tokenString);
@@ -32,7 +31,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn('[API] 401 Unauthorized terdeteksi. Membersihkan sesi...');
       
-      await SecureStore.deleteItemAsync('sv_user');
+      await authStorage.deleteItem('sv_user');
       useAuthStore.getState().logout();
     }
     

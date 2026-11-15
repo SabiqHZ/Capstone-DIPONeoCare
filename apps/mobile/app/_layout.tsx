@@ -3,18 +3,13 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
-  Nunito_400Regular,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  Nunito_800ExtraBold,
-  useFonts as useNunito,
-} from "@expo-google-fonts/nunito";
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  useFonts as useInter,
-} from "@expo-google-fonts/inter";
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  useFonts as usePoppins,
+} from "@expo-google-fonts/poppins";
 import { useAuthStore } from "../stores/auth.store";
 import { BabyProvider } from "../context/BabyContext";
 import { useNotifications } from "../hooks/useNotifications";
@@ -28,20 +23,15 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
 
-  const [nunitoLoaded] = useNunito({
-    Nunito_400Regular,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
+  const [poppinsLoaded] = usePoppins({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
   });
 
-  const [interLoaded] = useInter({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-  });
-
-  const fontsLoaded = nunitoLoaded && interLoaded;
+  const fontsLoaded = poppinsLoaded;
 
   useEffect(() => {
     hydrate();
@@ -52,11 +42,12 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
 
     const inAuth = segments[0] === "(auth)";
+    const inSplash = segments[0] === "splash";
     const inParent = segments[0] === "(parent)";
     const inCaregiver = segments[0] === "(caregiver)";
 
-    if (!user && !inAuth) {
-      router.replace("/(auth)/code-entry");
+    if (!user && !inAuth && !inSplash) {
+      router.replace("/(auth)");
     } else if (user?.role === "parent" && !inParent) {
       router.replace("/(parent)/dashboard");
     } else if (user?.role === "caregiver" && !inCaregiver) {

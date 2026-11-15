@@ -1,8 +1,9 @@
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { ComponentProps } from "react";
 import { useEffect, useState, useCallback } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   RefreshControl,
@@ -36,8 +37,16 @@ import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 import { DailyReport } from "../../types";
+import { formatDurationMinutes } from "../../utils/duration";
 import * as Clipboard from "expo-clipboard";
-import { ThemeSwitch, useTheme } from "../../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
+
+const Text = ({ style, ...props }: ComponentProps<typeof NativeText>) => (
+  <NativeText
+    {...props}
+    style={[{ fontFamily: Fonts.poppinsRegular }, style]}
+  />
+);
 
 interface BabyProfile {
   id: string;
@@ -56,13 +65,10 @@ export default function ParentDashboard() {
 
     await Clipboard.setStringAsync(babyProfile.unique_code);
 
-    Alert.alert(
-      "Kode disalin",
-      "Kode akses orang tua berhasil disalin.",
-    );
+    Alert.alert("Kode disalin", "Kode akses orang tua berhasil disalin.");
   };
   const router = useRouter();
-  const { isDark, toggleMode } = useTheme();
+  const { isDark } = useTheme();
 
   const { setFocused, acknowledgeAlert } = useBabyContext();
   const status = useFocusedBabyStatus();
@@ -91,74 +97,80 @@ export default function ParentDashboard() {
 
   const logout = useAuthStore((s) => s.logout);
 
-  const fetchBabyProfile = useCallback(async (isRefreshing = false) => {
-    if (!babyId) {
-      setBabyProfile(null);
-      setProfileError(true);
-      setIsProfileLoading(false);
-      return;
-    }
-
-    try {
-      if (!isRefreshing) {
-        setIsProfileLoading(true);
-        setProfileError(false);
+  const fetchBabyProfile = useCallback(
+    async (isRefreshing = false) => {
+      if (!babyId) {
+        setBabyProfile(null);
+        setProfileError(true);
+        setIsProfileLoading(false);
+        return;
       }
 
-      const res = await babyService.getBabyById(babyId);
+      try {
+        if (!isRefreshing) {
+          setIsProfileLoading(true);
+          setProfileError(false);
+        }
 
-      if (!res) {
+        const res = await babyService.getBabyById(babyId);
+
+        if (!res) {
+          if (!isRefreshing) {
+            setBabyProfile(null);
+            setProfileError(true);
+          }
+          return;
+        }
+
+        setBabyProfile(res as BabyProfile);
+        setProfileError(false);
+      } catch (err) {
+        console.error("[ParentDashboard] Gagal memuat profil bayi:", err);
+
         if (!isRefreshing) {
           setBabyProfile(null);
           setProfileError(true);
         }
+      } finally {
+        if (!isRefreshing) {
+          setIsProfileLoading(false);
+        }
+      }
+    },
+    [babyId],
+  );
+
+  const fetchDailyReport = useCallback(
+    async (isRefreshing = false) => {
+      if (!babyId) {
+        setDailyReport(null);
         return;
       }
 
-      setBabyProfile(res as BabyProfile);
-      setProfileError(false);
-    } catch (err) {
-      console.error("[ParentDashboard] Gagal memuat profil bayi:", err);
+      try {
+        if (!isRefreshing) {
+          setIsReportLoading(true);
+        }
 
-      if (!isRefreshing) {
-        setBabyProfile(null);
-        setProfileError(true);
+        const today = new Date().toISOString().split("T")[0];
+
+        const report = await reportService.getDailyReport(babyId, today);
+
+        setDailyReport(report);
+      } catch (err) {
+        console.error("[ParentDashboard] Gagal memuat laporan harian:", err);
+
+        if (!isRefreshing) {
+          setDailyReport(null);
+        }
+      } finally {
+        if (!isRefreshing) {
+          setIsReportLoading(false);
+        }
       }
-    } finally {
-      if (!isRefreshing) {
-        setIsProfileLoading(false);
-      }
-    }
-  }, [babyId]);
-
-  const fetchDailyReport = useCallback(async (isRefreshing = false) => {
-    if (!babyId) {
-      setDailyReport(null);
-      return;
-    }
-
-    try {
-      if (!isRefreshing) {
-        setIsReportLoading(true);
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const report = await reportService.getDailyReport(babyId, today);
-
-      setDailyReport(report);
-    } catch (err) {
-      console.error("[ParentDashboard] Gagal memuat laporan harian:", err);
-
-      if (!isRefreshing) {
-        setDailyReport(null);
-      }
-    } finally {
-      if (!isRefreshing) {
-        setIsReportLoading(false);
-      }
-    }
-  }, [babyId]);
+    },
+    [babyId],
+  );
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -177,6 +189,11 @@ export default function ParentDashboard() {
 
     void fetchBabyProfile();
     void fetchDailyReport();
+    const refreshId = setInterval(() => {
+      void setFocused(babyId);
+      void fetchBabyProfile(true);
+    }, 15000);
+    return () => clearInterval(refreshId);
   }, [babyId, setFocused, fetchBabyProfile, fetchDailyReport]);
 
   useEffect(() => {
@@ -189,7 +206,7 @@ export default function ParentDashboard() {
     setIsLoggingOut(true);
     try {
       await logout();
-      router.replace("/(auth)/code-entry");
+      router.replace("/(auth)");
     } catch (error) {
       console.error("[ParentDashboard] Gagal keluar dari akun:", error);
       setIsLogoutConfirmVisible(false);
@@ -253,53 +270,20 @@ export default function ParentDashboard() {
 
   const visibleAlerts = alerts.slice(0, 3);
 
-  const deviceOnline = status?.deviceOnline ?? null;
-
-  const isDeviceStatusUnknown = deviceOnline === null;
-
-  const deviceBadgeBackground = isDeviceStatusUnknown
-    ? Colors.neutralLight
-    : deviceOnline
-      ? Colors.successLight
-      : Colors.offlineLight;
-
-  const deviceStatusColor = isDeviceStatusUnknown
-    ? Colors.neutral
-    : deviceOnline
-      ? Colors.success
-      : Colors.offlineDark;
-
   const todaySleepMinutes = dailyReport?.totalSleepMinutes ?? 0;
 
   const todayAwakeMinutes = dailyReport?.totalAwakeMinutes ?? 0;
 
   const todayCryingEvents = dailyReport?.totalCryingEvents ?? 0;
 
-  const formatDuration = (minutes: number) => {
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      return "0m";
-    }
-
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-
-    if (hours <= 0) {
-      return `${remainingMinutes}m`;
-    }
-
-    if (remainingMinutes === 0) {
-      return `${hours}j`;
-    }
-
-    return `${hours}j ${remainingMinutes}m`;
-  };
-
   if (!babyId) {
     return null;
   }
 
   return (
-    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+    <SafeAreaView
+      style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -319,54 +303,16 @@ export default function ParentDashboard() {
 
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={[styles.greeting, isDark && { color: "#86EFAC" }]}>Halo, Orang Tua</Text>
+            <Text style={[styles.greeting, isDark && { color: "#86EFAC" }]}>
+              Halo, Orang Tua
+            </Text>
 
             <Text style={[styles.babyName, isDark && { color: "#F9FAFB" }]}>
               {babyName || babyProfile?.name || "Bayi"}
             </Text>
-
-            {babyProfile?.bed_number ? (
-              <Text style={[styles.bedNumber, isDark && { color: "#9CA3AF" }]}>
-                Tempat tidur {babyProfile.bed_number}
-              </Text>
-            ) : null}
           </View>
 
           <View style={styles.headerRight}>
-            <ThemeSwitch />
-            <View
-              style={[
-                styles.deviceBadge,
-                {
-                  backgroundColor: deviceBadgeBackground,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.deviceDot,
-                  {
-                    backgroundColor: deviceStatusColor,
-                  },
-                ]}
-              />
-
-              <Text
-                style={[
-                  styles.deviceBadgeText,
-                  {
-                    color: deviceStatusColor,
-                  },
-                ]}
-              >
-                {isDeviceStatusUnknown
-                  ? "Belum diketahui"
-                  : deviceOnline
-                    ? "Aktif"
-                    : "Tidak aktif"}
-              </Text>
-            </View>
-
             <TouchableOpacity
               style={styles.logoutBtn}
               onPress={handleLogout}
@@ -374,10 +320,21 @@ export default function ParentDashboard() {
               accessibilityRole="button"
               accessibilityLabel="Keluar dari akun"
             >
-              <Icon name="log-out-outline" library="ionicons" size={21} color={Colors.criticalDark} />
+              <Icon
+                name="log-out-outline"
+                library="ionicons"
+                size={26}
+                color={Colors.criticalDark}
+              />
             </TouchableOpacity>
           </View>
         </View>
+        <View
+          style={[
+            styles.headerDivider,
+            isDark && { backgroundColor: "#374151" },
+          ]}
+        />
 
         {/* =====================================================
             MONITORING HEADER
@@ -385,8 +342,11 @@ export default function ParentDashboard() {
 
         <View style={styles.monitoringHeader}>
           <View style={styles.monitoringHeaderText}>
-            <Text style={[styles.monitoringTitle, isDark && { color: "#D1FAE5" }]}>Status Bayi</Text>
-
+            <Text
+              style={[styles.monitoringTitle, isDark && { color: "#D1FAE5" }]}
+            >
+              Status Bayi
+            </Text>
           </View>
         </View>
 
@@ -397,16 +357,24 @@ export default function ParentDashboard() {
         {status ? (
           <ActivityCard
             key={`${status.activity}-${status.soundClass}-${status.lastUpdated}`}
-            activity={status.activity}
-            soundClass={status.soundClass}
-            soundConfidence={status.soundConfidence}
-            faceAnomaly={status.faceAnomaly}
+            activity={status.deviceOnline === false ? null : status.activity}
+            cameraOnline={status.deviceOnline}
           />
         ) : (
-          <View style={[styles.monitoringLoading, isDark && { backgroundColor: "#1F2937" }]}>
+          <View
+            style={[
+              styles.monitoringLoading,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
+          >
             <ActivityIndicator size="small" color="#1D9E75" />
 
-            <Text style={[styles.monitoringLoadingText, isDark && { color: "#D1D5DB" }]}>
+            <Text
+              style={[
+                styles.monitoringLoadingText,
+                isDark && { color: "#D1D5DB" },
+              ]}
+            >
               Menghubungkan ke data bayi...
             </Text>
           </View>
@@ -427,7 +395,9 @@ export default function ParentDashboard() {
               style={[
                 styles.freshnessDot,
                 {
-                  backgroundColor: isStatusStale ? Colors.warning : Colors.success,
+                  backgroundColor: isStatusStale
+                    ? Colors.warning
+                    : Colors.success,
                 },
               ]}
             />
@@ -456,7 +426,11 @@ export default function ParentDashboard() {
         {visibleAlerts.length > 0 ? (
           <View style={styles.alertSection}>
             <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}>Perlu perhatian</Text>
+              <Text
+                style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}
+              >
+                Perlu perhatian
+              </Text>
 
               <Text style={styles.alertCount}>{visibleAlerts.length}</Text>
             </View>
@@ -491,42 +465,30 @@ export default function ParentDashboard() {
         <FaceAnomalyBanner
           visible={showFaceAnomaly}
           onDismiss={() => setFaceAnomalyDismissed(true)}
+          anomalyType={status?.faceAnomaly}
         />
-
-        {/* =====================================================
-            CAMERA CTA
-        ====================================================== */}
-
-        <TouchableOpacity
-          style={styles.cameraButton}
-          activeOpacity={0.85}
-          onPress={() => router.push("/(parent)/camera")}
-          accessibilityRole="button"
-          accessibilityLabel="Lihat kamera bayi"
-          accessibilityHint="Membuka pemantauan kamera secara langsung"
-        >
-          <View style={styles.cameraButtonIcon}>
-            <Text style={styles.cameraButtonIconText}>●</Text>
-          </View>
-
-          <View style={styles.cameraButtonContent}>
-            <Text style={styles.cameraButtonTitle}>Lihat Kamera</Text>
-
-          </View>
-
-          <Text style={styles.cameraButtonArrow}>›</Text>
-        </TouchableOpacity>
 
         {/* =====================================================
             DAILY SUMMARY
         ====================================================== */}
 
-        <View style={[styles.todaySection, isDark && { backgroundColor: "#1F2937" }]}>
+        <View
+          style={[
+            styles.todaySection,
+            isDark && { backgroundColor: "#1F2937" },
+          ]}
+        >
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}>Ringkasan Hari Ini</Text>
+              <Text
+                style={[styles.sectionTitle, isDark && { color: "#D1FAE5" }]}
+              >
+                Ringkasan Hari Ini
+              </Text>
 
-              <Text style={[styles.sectionSubtitle, isDark && { color: "#9CA3AF" }]}>
+              <Text
+                style={[styles.sectionSubtitle, isDark && { color: "#9CA3AF" }]}
+              >
                 Aktivitas bayi hari ini
               </Text>
             </View>
@@ -549,26 +511,61 @@ export default function ParentDashboard() {
             </View>
           ) : (
             <View style={styles.summaryGrid}>
-              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
-                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>
-                  {formatDuration(todaySleepMinutes)}
+              <View
+                style={[
+                  styles.summaryItem,
+                  isDark && { backgroundColor: "#26372F" },
+                ]}
+              >
+                <Text
+                  style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}
+                >
+                  {formatDurationMinutes(todaySleepMinutes)}
                 </Text>
 
-                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Tidur</Text>
+                <Text
+                  style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}
+                >
+                  Tidur
+                </Text>
               </View>
 
-              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
-                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>
-                  {formatDuration(todayAwakeMinutes)}
+              <View
+                style={[
+                  styles.summaryItem,
+                  isDark && { backgroundColor: "#26372F" },
+                ]}
+              >
+                <Text
+                  style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}
+                >
+                  {formatDurationMinutes(todayAwakeMinutes)}
                 </Text>
 
-                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Bangun</Text>
+                <Text
+                  style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}
+                >
+                  Bangun
+                </Text>
               </View>
 
-              <View style={[styles.summaryItem, isDark && { backgroundColor: "#26372F" }]}>
-                <Text style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}>{todayCryingEvents}x</Text>
+              <View
+                style={[
+                  styles.summaryItem,
+                  isDark && { backgroundColor: "#26372F" },
+                ]}
+              >
+                <Text
+                  style={[styles.summaryValue, isDark && { color: "#D1FAE5" }]}
+                >
+                  {todayCryingEvents}x
+                </Text>
 
-                <Text style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}>Menangis</Text>
+                <Text
+                  style={[styles.summaryLabel, isDark && { color: "#D1D5DB" }]}
+                >
+                  Menangis
+                </Text>
               </View>
             </View>
           )}
@@ -579,13 +576,23 @@ export default function ParentDashboard() {
         ====================================================== */}
 
         {isProfileLoading ? (
-          <View style={[styles.loadingBox, isDark && { backgroundColor: "#1F2937" }]}>
+          <View
+            style={[
+              styles.loadingBox,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
+          >
             <ActivityIndicator size="small" color="#1D9E75" />
 
             <Text style={styles.loadingText}>Memuat informasi bayi...</Text>
           </View>
         ) : profileError || !babyProfile ? (
-          <View style={[styles.loadingBox, isDark && { backgroundColor: "#1F2937" }]}>
+          <View
+            style={[
+              styles.loadingBox,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
+          >
             <Text style={styles.profileErrorTitle}>
               Informasi bayi belum dapat dimuat
             </Text>
@@ -606,22 +613,47 @@ export default function ParentDashboard() {
             </ActionButton>
           </View>
         ) : (
-          <View style={[styles.identityCard, isDark && { backgroundColor: "#1F2937" }]}>
-            <Text style={[styles.cardTitle, isDark && { color: "#D1FAE5" }]}>Informasi Bayi</Text>
+          <View
+            style={[
+              styles.identityCard,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
+          >
+            <Text style={[styles.cardTitle, isDark && { color: "#D1FAE5" }]}>
+              Informasi Bayi
+            </Text>
 
-            <View style={[styles.divider, isDark && { backgroundColor: "#374151" }]} />
+            <View
+              style={[styles.divider, isDark && { backgroundColor: "#374151" }]}
+            />
 
             <View style={styles.compactIdentity}>
-              <View style={[styles.compactIdentityItem, isDark && { backgroundColor: "#111827" }]}>
+              <View
+                style={[
+                  styles.compactIdentityItem,
+                  isDark && { backgroundColor: "#111827" },
+                ]}
+              >
                 <Text style={styles.infoLabel}>Nama</Text>
-
-                <Text style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}>{babyProfile.name}</Text>
+                <Text
+                  style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}
+                >
+                  {babyProfile.name}
+                </Text>
               </View>
 
-              <View style={[styles.compactIdentityItem, isDark && { backgroundColor: "#111827" }]}>
+              <View
+                style={[
+                  styles.compactIdentityItem,
+                  isDark && { backgroundColor: "#111827" },
+                ]}
+              >
                 <Text style={styles.infoLabel}>Tempat tidur</Text>
-
-                <Text style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}>{babyProfile.bed_number}</Text>
+                <Text
+                  style={[styles.infoValue, isDark && { color: "#F3F4F6" }]}
+                >
+                  {babyProfile.bed_number}
+                </Text>
               </View>
             </View>
 
@@ -629,7 +661,6 @@ export default function ParentDashboard() {
               <View style={styles.expandedContent}>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Tanggal Lahir</Text>
-
                   <Text style={styles.infoValue}>
                     {new Date(babyProfile.date_of_birth).toLocaleDateString(
                       "id-ID",
@@ -644,7 +675,6 @@ export default function ParentDashboard() {
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Nama Orang Tua</Text>
-
                   <Text style={styles.infoValue}>
                     {babyProfile.parent_name}
                   </Text>
@@ -652,12 +682,10 @@ export default function ParentDashboard() {
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Kode Unik Akses</Text>
-
                   <View style={styles.accessCodeValueContainer}>
                     <Text style={[styles.infoValue, styles.monoText]}>
                       {babyProfile.unique_code}
                     </Text>
-
                     <TouchableOpacity
                       style={styles.copyCodeButton}
                       onPress={copyParentAccessCode}
@@ -672,7 +700,6 @@ export default function ParentDashboard() {
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Terdaftar</Text>
-
                   <Text style={styles.infoValue}>
                     {new Date(babyProfile.created_at).toLocaleDateString(
                       "id-ID",
@@ -694,7 +721,6 @@ export default function ParentDashboard() {
               <Text style={styles.expandButtonText}>
                 {isExpanded ? "Sembunyikan detail" : "Lihat detail bayi"}
               </Text>
-
               <Svg
                 width="14"
                 height="14"
@@ -705,11 +731,7 @@ export default function ParentDashboard() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 style={{
-                  transform: [
-                    {
-                      rotate: isExpanded ? "180deg" : "0deg",
-                    },
-                  ],
+                  transform: [{ rotate: isExpanded ? "180deg" : "0deg" }],
                 }}
               >
                 <Path d="M6 9l6 6 6-6" />
@@ -746,13 +768,21 @@ export default function ParentDashboard() {
             }}
           />
           <View
-            style={[styles.logoutCard, isDark && { backgroundColor: "#1F2937" }]}
+            style={[
+              styles.logoutCard,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
             accessibilityViewIsModal
             accessibilityLabel="Konfirmasi keluar akun"
           >
             <View style={styles.logoutTopRow}>
               <View style={styles.logoutIcon}>
-                <Icon name="log-out-outline" library="ionicons" size={24} color={Colors.critical} />
+                <Icon
+                  name="log-out-outline"
+                  library="ionicons"
+                  size={24}
+                  color={Colors.critical}
+                />
               </View>
               <TouchableOpacity
                 style={styles.logoutCloseButton}
@@ -834,55 +864,26 @@ const styles = StyleSheet.create({
   },
 
   babyName: {
+    fontFamily: Fonts.poppinsBold,
     fontSize: 24,
     color: "#085041",
     fontWeight: "700",
   },
 
-  bedNumber: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
+  headerDivider: {
+    height: 1,
+    backgroundColor: "#DDE5E1",
   },
 
   headerRight: {
-    alignItems: "flex-end",
-    gap: 8,
-  },
-
-  deviceBadge: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-
-  deviceDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-
-  deviceBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
   },
 
   logoutBtn: {
-    backgroundColor: Colors.criticalLight,
-    borderRadius: Radii.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    minHeight: ControlSize.minTouchTarget,
+    width: 68,
+    minHeight: 68,
+    alignItems: "center",
     justifyContent: "center",
-  },
-
-  logoutText: {
-    fontSize: 11,
-    color: "#B91C1C",
-    fontWeight: "600",
   },
   logoutOverlay: {
     flex: 1,
@@ -907,8 +908,19 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
-  logoutTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  logoutCloseButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginTop: -8, marginRight: -8 },
+  logoutTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  logoutCloseButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -8,
+    marginRight: -8,
+  },
   logoutIcon: {
     width: 56,
     height: 56,
@@ -918,13 +930,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.criticalLight,
   },
   logoutTitle: {
-    fontFamily: Fonts.interSemiBold,
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 18,
     color: Colors.textPrimary,
     textAlign: "left",
   },
   logoutMessage: {
-    fontFamily: Fonts.interRegular,
+    fontFamily: Fonts.poppinsRegular,
     fontSize: 14,
     lineHeight: 21,
     color: Colors.textMuted,
@@ -946,7 +958,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutCancelText: {
-    fontFamily: Fonts.interRegular,
+    fontFamily: Fonts.poppinsRegular,
     fontSize: 14,
     color: Colors.textSecondary,
   },
@@ -959,7 +971,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutConfirmText: {
-    fontFamily: Fonts.interSemiBold,
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 14,
     color: Colors.white,
   },
@@ -1099,54 +1111,6 @@ const styles = StyleSheet.create({
   },
 
   /* Camera */
-
-  cameraButton: {
-    minHeight: 68,
-    borderRadius: Radii.card,
-    backgroundColor: "#085041",
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  cameraButtonIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  cameraButtonIconText: {
-    color: "#86EFAC",
-    fontSize: 18,
-  },
-
-  cameraButtonContent: {
-    flex: 1,
-  },
-
-  cameraButtonTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-
-  cameraButtonSubtitle: {
-    marginTop: 3,
-    fontSize: 11,
-    color: "#D1FAE5",
-  },
-
-  cameraButtonArrow: {
-    fontSize: 28,
-    fontWeight: "300",
-    color: "#FFFFFF",
-    marginLeft: 8,
-  },
 
   /* Daily summary */
 
@@ -1324,15 +1288,16 @@ const styles = StyleSheet.create({
   expandButtonText: {
     fontSize: 12,
     color: "#0F6E56",
-    fontFamily: Platform.OS === "ios" ? "Inter" : "sans-serif-medium",
+    fontFamily: Fonts.poppinsSemiBold,
     fontWeight: "600",
   },
 
   monoText: {
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    fontFamily: Fonts.poppinsMedium,
     color: "#0F6E56",
     letterSpacing: 0.5,
   },
+
   accessCodeValueContainer: {
     flexDirection: "row",
     alignItems: "center",

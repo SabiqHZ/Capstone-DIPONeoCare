@@ -37,7 +37,6 @@ function buildForm(
     timestamp?: string;
     startedAt?: string;
     durationSeconds?: number;
-    captureIds?: string[];
     file: Express.Multer.File;
   },
 ) {
@@ -68,10 +67,6 @@ function buildForm(
     form.append("durationSeconds", String(payload.durationSeconds));
   }
 
-  if (payload.captureIds) {
-    form.append("captureIds", JSON.stringify(payload.captureIds));
-  }
-
   // IMPORTANT:
   // FormData harus dibuat ulang setiap retry karena
   // stream request sebelumnya sudah digunakan.
@@ -93,7 +88,6 @@ export const aiDispatchService = {
       timestamp?: string;
       startedAt?: string;
       durationSeconds?: number;
-      captureIds?: string[];
       file: Express.Multer.File;
     },
   ) {

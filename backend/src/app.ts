@@ -70,7 +70,7 @@ setInterval(() => {
         babyId: device.baby_id,
         unitId: device.unit_id,
         deviceOnline: false,
-        lastUpdated: timestamp,
+        deviceLastSeenAt: timestamp,
       });
       const alert = await alertService.createAlert({
         babyId: device.baby_id,

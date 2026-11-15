@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useState,
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { CONFIG } from "../constants/config";
@@ -85,20 +86,78 @@ function babyReducer(state: BabyState, action: BabyAction): BabyState {
   }
 }
 
+function normalizeStatusPayload(payload: any): Partial<BabyStatus> & Pick<BabyStatus, "babyId"> {
+  const activity = payload.activity ?? payload.current_activity ?? null;
+  const isCrying = payload.isCrying ?? payload.is_crying ??
+    (activity === "crying" ? true : null);
+  const updatedAt = payload.lastUpdated ?? payload.updatedAt ?? payload.updated_at ?? null;
+
+  return {
+    ...payload,
+    babyId: payload.babyId ?? payload.baby_id,
+    activity: activity ?? (isCrying === true ? "crying" : null),
+    isCrying,
+    cryingDurationSec: payload.cryingDurationSec ?? payload.crying_duration_sec ?? null,
+    alertLevel: payload.alertLevel ?? payload.alert_level ?? null,
+    deviceOnline: payload.deviceOnline ?? payload.device_online ?? null,
+    deviceLastSeenAt: payload.deviceLastSeenAt ?? payload.device_last_seen_at ?? null,
+    lastUpdated: updatedAt,
+    soundClass: payload.soundClass ?? payload.sound_class ?? null,
+    soundConfidence: payload.soundConfidence ?? payload.sound_confidence ?? null,
+    faceAnomaly: payload.faceAnomaly ?? payload.face_anomaly ?? "none",
+  };
+}
+
 // ── Context ───────────────────────────────────────────────────────────
 interface BabyContextValue {
   state: BabyState;
+  statusNow: number;
   setFocused: (babyId: string) => void;
   acknowledgeAlert: (alertId: string) => Promise<void>;
 }
 
 const BabyContext = createContext<BabyContextValue | null>(null);
 
+const BABY_STATUS_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+export function isBabyDetectionExpired(
+  lastUpdated: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!lastUpdated) return false;
+  const updatedAt = Date.parse(lastUpdated);
+  return (
+    Number.isFinite(updatedAt) && now - updatedAt > BABY_STATUS_MAX_AGE_MS
+  );
+}
+
+function clearExpiredBabyStatus(
+  status: BabyStatus | null,
+  now: number,
+): BabyStatus | null {
+  if (!status || !isBabyDetectionExpired(status.lastUpdated, now)) return status;
+
+  return {
+    ...status,
+    isDetectionStale: true,
+    isCrying: null,
+    cryingDurationSec: null,
+    alertLevel: null,
+    activity: null,
+    soundClass: null,
+    soundConfidence: null,
+    faceAnomaly: null,
+    faceDetected: null,
+    bodyDetected: null,
+  };
+}
+
 // ── Provider ──────────────────────────────────────────────────────────
 let socketInstance: Socket | null = null;
 
 export function BabyProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(babyReducer, initialState);
+  const [statusNow, setStatusNow] = useState(Date.now());
   const token = useAuthStore((s) => s.user?.token ?? null);
   const role = useAuthStore((s) => s.user?.role ?? null);
   const unitId = useAuthStore((s) =>
@@ -110,6 +169,11 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
 
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
+
+  useEffect(() => {
+    const interval = setInterval(() => setStatusNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadAlerts = useCallback(async () => {
     if (!token) return;
@@ -170,10 +234,10 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
 
     socketInstance.on(
       "baby:status-update",
-      (data: Partial<BabyStatus> & Pick<BabyStatus, "babyId">) => {
-        // Jika data dari backend berupa snake_case, backend harus memetakan ke camelCase
-        // sebelum melakukan emit. Kita asumsikan data sudah berformat interface BabyStatus.
-        dispatchRef.current({ type: "SET_STATUS", payload: data });
+      (data: any) => {
+        const normalized = normalizeStatusPayload(data);
+        if (!normalized.babyId) return;
+        dispatchRef.current({ type: "SET_STATUS", payload: normalized });
       },
     );
 
@@ -239,7 +303,7 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
           ? parsedSoundConfidence
           : null;
 
-      const initialStatus: BabyStatus = {
+      const initialStatus = normalizeStatusPayload({
         babyId: id,
         babyName: babyData.name,
         bedNumber: babyData.bed_number || babyData.bedNumber || "-",
@@ -265,8 +329,8 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
         soundConfidence,
 
         // null berarti belum ada hasil deteksi anomaly
-        faceAnomaly: statusData?.face_anomaly ?? null,
-      };
+        faceAnomaly: statusData?.face_anomaly ?? "none",
+      }) as BabyStatus;
 
       dispatch({
         type: "SET_STATUS",
@@ -304,7 +368,9 @@ export function BabyProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <BabyContext.Provider value={{ state, setFocused, acknowledgeAlert }}>
+    <BabyContext.Provider
+      value={{ state, statusNow, setFocused, acknowledgeAlert }}
+    >
       {children}
     </BabyContext.Provider>
   );
@@ -319,14 +385,22 @@ export function useBabyContext() {
 }
 
 export function useFocusedBabyStatus(): BabyStatus | null {
-  const { state } = useBabyContext();
+  const { state, statusNow } = useBabyContext();
   if (!state.focusedBabyId) return null;
-  return state.statuses[state.focusedBabyId] ?? null;
+  return clearExpiredBabyStatus(
+    state.statuses[state.focusedBabyId] ?? null,
+    statusNow,
+  );
 }
 
 export function useAllBabyStatuses(): Record<string, BabyStatus> {
-  const { state } = useBabyContext();
-  return state.statuses;
+  const { state, statusNow } = useBabyContext();
+  return Object.fromEntries(
+    Object.entries(state.statuses).map(([babyId, status]) => [
+      babyId,
+      clearExpiredBabyStatus(status, statusNow),
+    ]),
+  ) as Record<string, BabyStatus>;
 }
 
 export function useActiveAlerts(): AlertNotification[] {
@@ -335,6 +409,6 @@ export function useActiveAlerts(): AlertNotification[] {
 }
 
 export function useBabyStatusById(babyId: string): BabyStatus | null {
-  const { state } = useBabyContext();
-  return state.statuses[babyId] ?? null;
+  const { state, statusNow } = useBabyContext();
+  return clearExpiredBabyStatus(state.statuses[babyId] ?? null, statusNow);
 }

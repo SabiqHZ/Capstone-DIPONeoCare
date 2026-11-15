@@ -14,6 +14,7 @@ import {
   Pressable,
 } from "react-native";
 import { BlurView } from "expo-blur";
+import * as Clipboard from "expo-clipboard";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
@@ -27,6 +28,7 @@ import {
   useBabyContext,
   useBabyStatusById,
   useActiveAlerts,
+  isBabyDetectionExpired,
 } from "../../../context/BabyContext";
 import React from "react";
 
@@ -104,6 +106,15 @@ export default function BabyDetailScreen() {
     fetchBaby();
     if (id) setFocused(id);
   }, [id, setFocused, fetchBaby]);
+
+  useEffect(() => {
+    if (!id) return;
+    const refreshId = setInterval(() => {
+      void fetchBaby();
+      void setFocused(id);
+    }, 15000);
+    return () => clearInterval(refreshId);
+  }, [id, fetchBaby, setFocused]);
 
   const deviceId = baby?.devices?.id;
 
@@ -323,23 +334,35 @@ export default function BabyDetailScreen() {
   const isDeviceOnline =
     realtimeStatus?.deviceOnline ?? baby.devices?.is_online ?? false;
 
-  const isCrying =
-    realtimeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null;
+  const detectionExpired = Boolean(
+    realtimeStatus?.isDetectionStale ||
+    isBabyDetectionExpired(
+      realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+    ),
+  );
 
-  const faceAnomaly =
-    realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+  const isCrying = detectionExpired
+    ? null
+    : (realtimeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
 
-  // null berarti AI belum memberikan hasil; jangan menyamakannya dengan kondisi normal.
-  const faceStatusUnknown = faceAnomaly == null;
+  const faceAnomaly = detectionExpired
+    ? null
+    : (realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
+
+  const activity = detectionExpired
+    ? null
+    : (realtimeStatus?.activity ?? baby.baby_statuses?.activity ?? null);
+
+  // Gunakan satu status klasifikasi yang sama untuk seluruh kartu di detail bayi.
+  const noBabyDetected = detectionExpired || activity == null;
+  const faceStatusUnknown = noBabyDetected || faceAnomaly == null;
   const faceCovered = !faceStatusUnknown && faceAnomaly !== "none";
 
-  const activity =
-    realtimeStatus?.activity ?? baby.baby_statuses?.activity ?? null;
-
-  const cryingDurationSec =
-    realtimeStatus?.cryingDurationSec ??
-    baby.baby_statuses?.crying_duration_sec ??
-    null;
+  const cryingDurationSec = detectionExpired
+    ? null
+    : (realtimeStatus?.cryingDurationSec ??
+      baby.baby_statuses?.crying_duration_sec ??
+      null);
 
   const lastUpdated =
     realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at ?? null;
@@ -431,6 +454,21 @@ export default function BabyDetailScreen() {
               value={new Date(baby.created_at).toLocaleDateString("id-ID")}
             />
           </View>
+          <TouchableOpacity
+            style={styles.copyParentCodeButton}
+            onPress={async () => {
+              if (!baby.unique_code) return;
+              await Clipboard.setStringAsync(baby.unique_code);
+              Alert.alert("Kode disalin", "Kode akses orang tua berhasil disalin.");
+            }}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Salin kode akses orang tua"
+            accessibilityHint="Menyalin kode agar dapat dibagikan kepada orang tua"
+          >
+            <Icon name="copy-outline" library="ionicons" size={17} color={Colors.secondaryDark} />
+            <Text style={styles.copyParentCodeText}>Salin kode orang tua</Text>
+          </TouchableOpacity>
         </View>
 
         {babyAlerts.map((a) => (
@@ -505,9 +543,6 @@ export default function BabyDetailScreen() {
                     <View style={styles.cameraMessageOverlay}>
                       {hasStreamError ? (
                         <>
-                          <Text style={styles.offlineText}>
-                            Belum menerima gambar kamera
-                          </Text>
                           <Text style={styles.offlineSub}>
                             Mencoba kembali secara otomatis...
                           </Text>
@@ -594,7 +629,7 @@ export default function BabyDetailScreen() {
                 <Text style={styles.aiCardLabel}>Suara</Text>
                 <Text style={styles.aiCardValue}>
                   {isCrying === null
-                    ? "Menunggu hasil pemantauan"
+                    ? "Tidak ada bayi yang terdeteksi"
                     : isCrying
                       ? `Menangis${
                           cryingDurationSec != null
@@ -625,7 +660,7 @@ export default function BabyDetailScreen() {
                     faceStatusUnknown
                       ? Colors.neutral
                       : faceCovered
-                        ? Colors.warning
+                        ? Colors.critical
                         : Colors.success
                   }
                 />
@@ -637,9 +672,11 @@ export default function BabyDetailScreen() {
                   ]}
                 >
                   {faceStatusUnknown
-                    ? "Menunggu hasil pemantauan"
+                    ? noBabyDetected
+                      ? "Tidak ada bayi yang terdeteksi"
+                      : "Menunggu hasil pemantauan"
                     : faceCovered
-                      ? "Tertutup!"
+                      ? "Tertutupi!"
                       : "Terlihat"}
                 </Text>
               </View>
@@ -654,7 +691,7 @@ export default function BabyDetailScreen() {
                 <Text style={styles.aiCardLabel}>Aktivitas</Text>
                 <Text style={styles.aiCardValue}>
                   {activity === null
-                    ? "Menunggu hasil pemantauan"
+                    ? "Tidak ada bayi yang terdeteksi"
                     : activity === "sleeping"
                       ? "Tidur"
                       : activity === "awake"
@@ -664,7 +701,9 @@ export default function BabyDetailScreen() {
               </View>
             </View>
             <Text style={styles.lastUpdated}>
-              Diperbarui:{" "}
+              {detectionExpired
+                ? "Tidak ada bayi yang terdeteksi · terakhir diperbarui "
+                : "Diperbarui: "}
               {lastUpdated
                 ? new Date(lastUpdated).toLocaleTimeString("id-ID")
                 : "Menunggu hasil pemantauan"}
@@ -719,7 +758,6 @@ export default function BabyDetailScreen() {
         )}
 
         <View style={styles.dangerCard}>
-          <Text style={styles.dangerTitle}>Zona Berbahaya</Text>
           <TouchableOpacity
             style={styles.dischargeBtn}
             onPress={handleDischarge}
@@ -1054,6 +1092,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  copyParentCodeButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: Radii.control,
+    borderWidth: 1,
+    borderColor: Colors.secondaryLight,
+    backgroundColor: Colors.secondaryLight,
+  },
+  copyParentCodeText: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 13,
+    color: Colors.secondaryDark,
+  },
   noPairBox: {
     backgroundColor: Colors.white,
     borderRadius: Radii.card,
@@ -1177,9 +1232,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.critical,
   },
   anomalyActive: {
-    backgroundColor: Colors.warningLight,
+    backgroundColor: Colors.criticalLight,
     borderWidth: 1,
-    borderColor: Colors.warning,
+    borderColor: Colors.critical,
   },
   aiCardLabel: {
     fontFamily: Fonts.interRegular,
@@ -1187,8 +1242,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   aiCardValue: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 12,
+    fontFamily: Fonts.interMedium,
+    fontSize: 9,
     color: Colors.textPrimary,
     textAlign: "center",
   },

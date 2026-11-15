@@ -14,7 +14,7 @@ type FinalizedStatus = {
   activity: "sleeping" | "awake" | "crying";
   flags: ActivityFlags;
 
-  soundClass: "crying" | "not_crying";
+  soundClass: "crying" | "not_crying" | null;
   soundConfidence: number;
 
   cryingClass: "hungry" | "pain" | "discomfort" | null;
@@ -25,8 +25,31 @@ type FinalizedStatus = {
   updatedAt: string;
 };
 const ANOMALY_CONTINUITY_GAP_MS = 1_500;
+const AUDIO_WINDOW_DURATION_MS = 5_000;
+
+type AudioWindow = {
+  audioWindowId: string;
+  startedAt: string;
+  durationSeconds: number;
+};
 
 export const inferenceService = {
+  async saveAudioWindow(
+    device: DeviceContext,
+    audioWindow: AudioWindow,
+  ): Promise<void> {
+    const { error } = await supabaseAdmin.from("ai_audio_windows").upsert(
+      {
+        device_id: device.id,
+        audio_window_id: audioWindow.audioWindowId,
+        started_at: audioWindow.startedAt,
+        duration_seconds: audioWindow.durationSeconds,
+      },
+      { onConflict: "device_id,audio_window_id" },
+    );
+    if (error) throw new Error(error.message);
+  },
+
   async saveVisionResult(device: DeviceContext, payload: VisionResultPayload) {
     if (!device.baby_id) throw new Error("Perangkat belum dipair ke bayi");
     const { error } = await supabaseAdmin.from("ai_vision_results").upsert(
@@ -52,7 +75,7 @@ export const inferenceService = {
   async saveAudioResults(device: DeviceContext, results: AudioSecondResult[]) {
     const rows = results.map((result) => ({
       device_id: device.id,
-      capture_id: result.captureId,
+      capture_id: result.captureId ?? `audio-${Date.parse(result.timestamp)}`,
       captured_at: result.timestamp,
       is_crying: result.isCrying,
       confidence: result.confidence ?? null,
@@ -71,9 +94,19 @@ export const inferenceService = {
 
   async finalizeMatches(
     device: DeviceContext,
-    captureIds: string[],
+    audioWindow: AudioWindow | null,
+    onlyVisionTimestamp?: string,
   ): Promise<FinalizedStatus[]> {
-    if (!device.baby_id || captureIds.length === 0) return [];
+    if (!device.baby_id) return [];
+    const startTime = audioWindow
+      ? Date.parse(audioWindow.startedAt)
+      : Date.parse(onlyVisionTimestamp ?? "");
+    if (!Number.isFinite(startTime)) return [];
+    const endTime = audioWindow
+      ? startTime + audioWindow.durationSeconds * 1_000
+      : startTime;
+    const from = new Date(startTime).toISOString();
+    const to = new Date(endTime).toISOString();
     const [
       { data: visions, error: visionError },
       { data: audios, error: audioError },
@@ -82,31 +115,60 @@ export const inferenceService = {
         .from("ai_vision_results")
         .select("*")
         .eq("device_id", device.id)
-        .in("capture_id", captureIds),
-      supabaseAdmin
-        .from("ai_audio_results")
-        .select("*")
-        .eq("device_id", device.id)
-        .in("capture_id", captureIds),
+        .gte("captured_at", from)
+        .lte("captured_at", to),
+      audioWindow
+        ? supabaseAdmin
+            .from("ai_audio_results")
+            .select("*")
+            .eq("device_id", device.id)
+            .gte("captured_at", from)
+            .lte("captured_at", to)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (visionError) throw new Error(visionError.message);
     if (audioError) throw new Error(audioError.message);
 
-    const audioByCapture = new Map(
-      (audios ?? []).map((audio: any) => [audio.capture_id, audio]),
-    );
     const finalized: FinalizedStatus[] = [];
+    const matchedAudioIds = new Set<string>();
 
-    for (const vision of visions ?? []) {
-      const audio = audioByCapture.get(vision.capture_id) as any;
-      if (!audio) continue;
+    for (const vision of (visions ?? []).filter((item: any) => {
+      const timestamp = Date.parse(item.captured_at);
+      return (
+        timestamp >= startTime &&
+        timestamp <= endTime &&
+        (onlyVisionTimestamp === undefined ||
+          timestamp === Date.parse(onlyVisionTimestamp))
+      );
+    })) {
+      const visionTime = Date.parse(vision.captured_at);
+      const audio = (audios ?? [])
+        .filter((candidate: any) => !matchedAudioIds.has(candidate.capture_id))
+        .map((candidate: any) => ({
+          candidate,
+          distance: Math.abs(
+            Date.parse(candidate.captured_at) - visionTime,
+          ),
+        }))
+        .filter(
+          ({ candidate, distance }) =>
+            distance <= AUDIO_WINDOW_DURATION_MS &&
+            Date.parse(candidate.captured_at) >= startTime &&
+            Date.parse(candidate.captured_at) <= endTime,
+        )
+        .sort((left, right) => left.distance - right.distance)[0]?.candidate;
+      if (audio) matchedAudioIds.add(audio.capture_id);
 
-      const crying = Boolean(vision.visual_crying) && Boolean(audio.is_crying);
+      // Vision is sufficient to publish the current activity. Audio enriches
+      // the result when available, but must not gate frontend status updates.
+      const crying = Boolean(vision.visual_crying);
       const cryingClass =
-        crying && audio.crying_class ? audio.crying_class : null;
+        crying && audio?.is_crying && audio.crying_class
+          ? audio.crying_class
+          : null;
 
       const cryingClassConfidence =
-        crying && audio.crying_class_confidence != null
+        crying && audio?.is_crying && audio.crying_class_confidence != null
           ? Number(audio.crying_class_confidence)
           : null;
       const flags: ActivityFlags = crying
@@ -128,9 +190,9 @@ export const inferenceService = {
         flags,
         recordedAt: vision.captured_at,
         visualCrying: Boolean(vision.visual_crying),
-        audioCrying: Boolean(audio.is_crying),
+        audioCrying: Boolean(audio?.is_crying),
         visualConfidence: vision.visual_confidence ?? undefined,
-        audioConfidence: audio.confidence ?? undefined,
+        audioConfidence: audio?.confidence ?? undefined,
         cryingClass,
       });
 
@@ -145,8 +207,10 @@ export const inferenceService = {
         flags,
         cryingDurationSec,
         alertLevel: crying ? "warning" : "normal",
-        soundClass: audio.is_crying ? "crying" : "not_crying",
-        soundConfidence: Number(audio.confidence ?? 0),
+        soundClass: audio
+          ? audio.is_crying ? "crying" : "not_crying"
+          : null,
+        soundConfidence: Number(audio?.confidence ?? 0),
         anomalyType: vision.anomaly_detected ? vision.anomaly_type : null,
         updatedAt: vision.captured_at,
         cryingClass,
@@ -157,8 +221,10 @@ export const inferenceService = {
         unitId: device.unit_id,
         activity,
         flags,
-        soundClass: audio.is_crying ? "crying" : "not_crying",
-        soundConfidence: Number(audio.confidence ?? 0),
+        soundClass: audio
+          ? audio.is_crying ? "crying" : "not_crying"
+          : null,
+        soundConfidence: Number(audio?.confidence ?? 0),
 
         cryingDurationSec,
         anomalyType: vision.anomaly_detected ? vision.anomaly_type : null,
@@ -168,6 +234,108 @@ export const inferenceService = {
       });
     }
     return finalized;
+  },
+
+  async finalizeVisionResult(
+    device: DeviceContext,
+    timestamp: string,
+  ): Promise<FinalizedStatus[]> {
+    return this.finalizeMatches(device, null, timestamp);
+  },
+
+  async findAudioWindowForResults(
+    device: DeviceContext,
+    results: AudioSecondResult[],
+    metadata?: { audioWindowId?: string; startedAt?: string },
+  ): Promise<AudioWindow | null> {
+    if (metadata?.audioWindowId) {
+      const { data, error } = await supabaseAdmin
+        .from("ai_audio_windows")
+        .select("audio_window_id, started_at, duration_seconds")
+        .eq("device_id", device.id)
+        .eq("audio_window_id", metadata.audioWindowId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data) {
+        return {
+          audioWindowId: data.audio_window_id,
+          startedAt: data.started_at,
+          durationSeconds: Number(data.duration_seconds),
+        };
+      }
+      return null;
+    }
+
+    const resultTimes = results
+      .map((result) => Date.parse(result.timestamp))
+      .filter(Number.isFinite);
+    if (resultTimes.length === 0) return null;
+    const earliest = Math.min(...resultTimes);
+    const latest = Math.max(...resultTimes);
+
+    let query = supabaseAdmin
+      .from("ai_audio_windows")
+      .select("audio_window_id, started_at, duration_seconds")
+      .eq("device_id", device.id);
+    if (metadata?.startedAt) {
+      query = query.eq("started_at", metadata.startedAt);
+    } else {
+      query = query
+        .gte(
+          "started_at",
+          new Date(earliest - AUDIO_WINDOW_DURATION_MS).toISOString(),
+        )
+        .lte("started_at", new Date(latest).toISOString());
+    }
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const windows = (data ?? [])
+      .map((item: any) => ({
+        audioWindowId: item.audio_window_id as string,
+        startedAt: item.started_at as string,
+        durationSeconds: Number(item.duration_seconds),
+      }))
+      .filter((window) => {
+        const start = Date.parse(window.startedAt);
+        const end = start + window.durationSeconds * 1_000;
+        return resultTimes.every((time) => time >= start && time <= end);
+      })
+      .sort(
+        (left, right) =>
+          Math.abs(Date.parse(left.startedAt) - earliest) -
+          Math.abs(Date.parse(right.startedAt) - earliest),
+      );
+    return windows[0] ?? null;
+  },
+
+  async findAudioWindowsForFrame(
+    device: DeviceContext,
+    timestamp: string,
+  ): Promise<AudioWindow[]> {
+    const frameTime = Date.parse(timestamp);
+    if (!Number.isFinite(frameTime)) return [];
+    const { data, error } = await supabaseAdmin
+      .from("ai_audio_windows")
+      .select("audio_window_id, started_at, duration_seconds")
+      .eq("device_id", device.id)
+      .gte(
+        "started_at",
+        new Date(frameTime - AUDIO_WINDOW_DURATION_MS).toISOString(),
+      )
+      .lte("started_at", new Date(frameTime).toISOString());
+    if (error) throw new Error(error.message);
+    return (data ?? [])
+      .map((item: any) => ({
+        audioWindowId: item.audio_window_id as string,
+        startedAt: item.started_at as string,
+        durationSeconds: Number(item.duration_seconds),
+      }))
+      .filter((window) => {
+        const start = Date.parse(window.startedAt);
+        return frameTime >= start &&
+          frameTime <= start + window.durationSeconds * 1_000;
+      });
   },
 
   async trackAnomaly(device: DeviceContext, payload: VisionResultPayload) {
@@ -328,17 +496,12 @@ export const inferenceService = {
       (Date.parse(event.last_detected_at) - Date.parse(event.started_at)) /
       1_000;
 
-    /*
-     * Alert hanya boleh dibuat setelah anomaly kontinu
-     * mencapai 15 detik.
-     */
-    if (durationSeconds >= 15 && !event.alert_sent_at) {
+    // Kirim satu alert segera ketika anomaly pertama kali terdeteksi.
+    if (!event.alert_sent_at) {
       const alert = await alertService.createAlert({
         babyId: device.baby_id,
         type: "ANOMALY_DETECTED",
-        message:
-          `${event.anomaly_type} terdeteksi di area bayi ` +
-          `selama ${Math.floor(durationSeconds)} detik`,
+        message: `Singkirkan ${event.anomaly_type} dari area wajah bayi.`,
         severity: "critical",
       });
 

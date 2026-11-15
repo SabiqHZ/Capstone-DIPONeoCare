@@ -1,17 +1,17 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   Alert,
-  Image,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { OtpInput } from "../../components/ui/OtpInput";
@@ -24,29 +24,31 @@ const PARENT_LOGIN_ACCENT = "#26B893";
 
 export default function CodeEntryScreen() {
   const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
+  const headerHeight = useRef(
+    Math.min(300, Math.max(220, windowHeight * 0.34)),
+  ).current;
   const { setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(
+    "Kode tidak valid. Periksa kembali.",
+  );
   const [code, setCode] = useState("");
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const enterProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
-      setIsKeyboardVisible(true);
-    });
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      setIsKeyboardVisible(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
+    Animated.timing(enterProgress, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
+  }, [enterProgress]);
 
   const handleComplete = (val: string) => {
     setCode(val);
     setError(false);
+    setErrorMessage("Kode tidak valid. Periksa kembali.");
   };
 
   const handleSubmit = async () => {
@@ -59,7 +61,7 @@ export default function CodeEntryScreen() {
       router.replace("/(parent)/dashboard");
     } catch (err: any) {
       setError(true);
-      Alert.alert("Gagal Masuk", err.message || "Kode tidak valid");
+      setErrorMessage(err.message || "Kode tidak valid");
     } finally {
       setIsLoading(false);
     }
@@ -78,91 +80,100 @@ export default function CodeEntryScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <Animated.View
+        style={[
+          styles.flex,
+          {
+            opacity: enterProgress,
+            transform: [
+              {
+                translateY: enterProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [18, 0],
+                }),
+              },
+            ],
+          },
+        ]}
       >
-        <View style={styles.inner}>
-          <View
-            style={[
-              styles.header,
-              isKeyboardVisible && styles.headerKeyboardVisible,
-            ]}
-          >
-            <View pointerEvents="none" style={styles.gridPattern} />
-            <View pointerEvents="none" style={styles.dotPattern} />
-            <View style={styles.headerBrand}>
-              <View style={styles.logoCircle}>
-                <Image
-                  source={require("../../assets/icon.png")}
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.brandText}>
-                <Text style={styles.appName}>DIPONeoCare</Text>
-                <Text style={styles.appSub}>
-                  Smart Baby Monitoring, Safer Tomorrow.
-                </Text>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.inner}>
+            <TouchableOpacity
+              style={styles.backToWelcome}
+              onPress={() => router.replace("/(auth)")}
+              accessibilityRole="button"
+              accessibilityLabel="Kembali ke halaman awal"
+              hitSlop={8}
+            >
+              <Text style={styles.backArrow}>‹</Text>
+            </TouchableOpacity>
+            <View style={[styles.header, { height: headerHeight }]}>
+              <View pointerEvents="none" style={styles.gridPattern} />
+              <View pointerEvents="none" style={styles.dotPattern} />
+              <View style={styles.headerBrand}>
+                <View style={styles.brandText}>
+                  <Text style={styles.appName}>Masuk Orang Tua</Text>
+                  <Text style={styles.appSub}>
+                    Masuk dengan kode akses dari pengasuh
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Masukkan Kode Akses</Text>
-            <Text style={styles.cardDesc}>
-              Kode 8 karakter diberikan oleh pengasuh
-            </Text>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Masukkan Kode Akses</Text>
 
-            <OtpInput
-              onComplete={handleComplete}
-              disabled={isLoading}
-              error={error}
-              accentColor={PARENT_LOGIN_ACCENT}
-            />
+              <OtpInput
+                onComplete={handleComplete}
+                disabled={isLoading}
+                error={error}
+                accentColor={PARENT_LOGIN_ACCENT}
+              />
 
-            {error ? (
-              <Text style={styles.errorText}>
-                Kode tidak valid. Periksa kembali.
-              </Text>
-            ) : null}
+              {error ? (
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              ) : null}
 
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  code.length !== 8 || isLoading ? styles.btnDisabled : null,
+                ]}
+                onPress={handleSubmit}
+                disabled={code.length !== 8 || isLoading}
+                activeOpacity={0.8}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnText}>Masuk</Text>
+                )}
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={[
-                styles.btn,
-                code.length !== 8 || isLoading ? styles.btnDisabled : null,
-              ]}
-              onPress={handleSubmit}
-              disabled={code.length !== 8 || isLoading}
-              activeOpacity={0.8}
+              style={styles.codeHelpLink}
+              onPress={handleContactCaregiver}
+              accessibilityRole="link"
+              accessibilityLabel="Lupa kode? Hubungi Pengasuh melalui WhatsApp"
             >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Masuk</Text>
-              )}
+              <Text style={styles.codeHelpPrompt}>Lupa kode? </Text>
+              <Text style={styles.codeHelpAction}>Hubungi Pengasuh</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.nurseLink}
+              onPress={() => router.push("/(auth)/login")}
+              accessibilityRole="link"
+              accessibilityLabel="Pengasuh? Masuk di sini"
+            >
+              <Text style={styles.nurseLinkPrompt}>Pengasuh? </Text>
+              <Text style={styles.nurseLinkAction}>Masuk di sini</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.codeHelpLink}
-            onPress={handleContactCaregiver}
-            accessibilityRole="link"
-            accessibilityLabel="Lupa kode? Hubungi Pengasuh melalui WhatsApp"
-          >
-            <Text style={styles.codeHelpPrompt}>Lupa kode? </Text>
-            <Text style={styles.codeHelpAction}>Hubungi Pengasuh</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.nurseLink}
-            onPress={() => router.push("/(auth)/login")}
-            accessibilityRole="link"
-            accessibilityLabel="Pengasuh? Masuk di sini"
-          >
-            <Text style={styles.nurseLinkPrompt}>Pengasuh? </Text>
-            <Text style={styles.nurseLinkAction}>Masuk di sini</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -172,26 +183,36 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   inner: {
     flex: 1,
-    justifyContent: "center",
     paddingHorizontal: 20,
-    paddingTop: 48,
+    paddingTop: 0,
+    backgroundColor: "#F7F8FA",
+  },
+  backToWelcome: {
+    position: "absolute",
+    zIndex: 10,
+    top: 10,
+    left: 5,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  backArrow: {
+    color: Colors.white,
+    fontSize: 34,
+    lineHeight: 40,
+    fontFamily: "Poppins_400Regular",
   },
   header: {
-    alignItems: "center",
-    gap: 8,
+    alignItems: "flex-start",
+    justifyContent: "flex-end",
     backgroundColor: PARENT_LOGIN_ACCENT,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "49%",
-    paddingTop: 320,
-    paddingHorizontal: 24,
+    marginHorizontal: -20,
+    paddingTop: 56,
+    paddingBottom: 36,
+    paddingHorizontal: 28,
     overflow: "hidden",
-  },
-  headerKeyboardVisible: {
-    paddingTop: 85,
-    overflow: "visible",
   },
   gridPattern: {
     ...StyleSheet.absoluteFill,
@@ -210,24 +231,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   headerBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    alignSelf: "center",
-    maxWidth: 360,
+    alignItems: "flex-start",
+    alignSelf: "stretch",
+    maxWidth: 420,
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-    overflow: "hidden",
-  },
-  logoImage: { width: 96, height: 96 },
   brandText: {
     flexShrink: 1,
     maxWidth: 220,
@@ -251,7 +258,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 20,
     elevation: 8,
-    marginTop: 10,
+    marginTop: -20,
     width: "100%",
     maxWidth: 440,
     alignSelf: "center",
@@ -295,13 +302,12 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   nurseLink: {
-    position: "absolute",
-    bottom: 8,
-    left: 0,
-    right: 0,
+    alignSelf: "center",
     flexDirection: "row",
     justifyContent: "center",
     paddingVertical: 12,
+    marginTop: 230,
+    marginBottom: 12,
   },
   nurseLinkPrompt: {
     ...Typography.captionStrong,

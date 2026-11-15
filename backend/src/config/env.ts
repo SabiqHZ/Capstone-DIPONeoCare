@@ -32,6 +32,10 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
   JWT_SECRET: process.env.JWT_SECRET || "fallback_secret",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
+  PASSWORD_RECOVERY_ADMIN_WHATSAPP:
+    process.env.PASSWORD_RECOVERY_ADMIN_WHATSAPP?.trim() || "",
+  PASSWORD_RECOVERY_ADMIN_EMAIL:
+    process.env.PASSWORD_RECOVERY_ADMIN_EMAIL?.trim() || "",
   SUPABASE_URL: process.env.SUPABASE_URL || "",
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || "",
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",

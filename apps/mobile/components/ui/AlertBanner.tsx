@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Colors } from "../../constants/colors";
-import { Typography } from "../../constants/fonts";
+import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 interface AlertBannerProps {
@@ -108,6 +108,7 @@ const styles = StyleSheet.create({
   },
 
   iconText: {
+    fontFamily: Fonts.poppinsExtraBold,
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",

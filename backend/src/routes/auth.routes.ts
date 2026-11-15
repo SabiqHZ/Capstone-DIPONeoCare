@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/role.middleware';
 const router = Router();
 
 router.post('/nurse', authController.loginNurse);
+router.get('/nurse/recovery-contact', authController.getNurseRecoveryContact);
 router.post('/parent', authController.loginWithCode);
 router.get('/nurse/profile', authMiddleware, requireRole('nurse'), authController.getNurseProfile);
 router.patch('/nurse/profile', authMiddleware, requireRole('nurse'), authController.updateNurseProfile);

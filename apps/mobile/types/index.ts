@@ -31,7 +31,9 @@ export interface BabyStatus {
   cryingDurationSec: number | null;
   alertLevel: AlertLevel | null;
   deviceOnline: boolean | null;
+  deviceLastSeenAt?: string | null;
   lastUpdated: string | null;
+  isDetectionStale?: boolean;
   activity: BabyActivity | null;
   soundClass: SoundClass | null;
   soundConfidence: number | null;

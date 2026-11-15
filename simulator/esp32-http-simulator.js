@@ -22,7 +22,6 @@ const FALLBACK_AUDIO = path.join(SAMPLE_DIR, "fallback-5s.wav");
 const FRAME_INTERVAL_MS = 1_000;
 const AUDIO_INTERVAL_MS = 5_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
-const AUDIO_FRAME_COUNT = 5;
 
 let state = loadState();
 let frameTimer = null;
@@ -30,7 +29,6 @@ let audioTimer = null;
 let heartbeatTimer = null;
 let running = false;
 let frameSequence = 0;
-const recentFrames = [];
 
 function nowIso() {
   return new Date().toISOString();
@@ -282,9 +280,6 @@ async function uploadFrame() {
     );
   }
 
-  recentFrames.push({ captureId, timestamp });
-  while (recentFrames.length > AUDIO_FRAME_COUNT) recentFrames.shift();
-
   console.log(
     `[FRAME] ${captureId} ${response.status} accepted=${body?.data?.accepted}`,
   );
@@ -294,21 +289,12 @@ async function uploadFrame() {
 async function uploadAudio() {
   await ensureRegistered();
 
-  if (recentFrames.length < AUDIO_FRAME_COUNT) {
-    console.log(
-      `[AUDIO] skipped: baru ada ${recentFrames.length}/${AUDIO_FRAME_COUNT} frame`,
-    );
-    return;
-  }
-
   const filePath = resolveAudioPath();
   if (!fs.existsSync(filePath))
     throw new Error(`SIM_AUDIO_PATH tidak ditemukan: ${filePath}`);
 
-  const windowFrames = recentFrames.slice(-AUDIO_FRAME_COUNT);
   const audioWindowId = `audio-${crypto.randomUUID()}`;
-  const startedAt = windowFrames[0].timestamp;
-  const captureIds = windowFrames.map((frame) => frame.captureId);
+  const startedAt = nowIso();
   const buffer = fs.readFileSync(filePath);
 
   const form = new FormData();
@@ -321,7 +307,6 @@ async function uploadAudio() {
   form.append("audioWindowId", audioWindowId);
   form.append("startedAt", startedAt);
   form.append("durationSeconds", "5");
-  form.append("captureIds", JSON.stringify(captureIds));
 
   const response = await fetch(`${BACKEND_URL}/api/devices/upload/audio`, {
     method: "POST",
@@ -344,9 +329,9 @@ async function uploadAudio() {
   }
 
   console.log(
-    `[AUDIO] ${audioWindowId} ${response.status} captureIds=${captureIds.join(",")}`,
+    `[AUDIO] ${audioWindowId} ${response.status} startedAt=${startedAt}`,
   );
-  return { audioWindowId, captureIds, body };
+  return { audioWindowId, startedAt, body };
 }
 
 function startSimulation() {

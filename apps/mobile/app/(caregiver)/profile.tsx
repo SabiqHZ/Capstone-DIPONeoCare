@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, useRouter } from "expo-router";
+import { useNavigation, usePreventRemove, useRouter } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
 import { Fonts, Typography } from "../../constants/fonts";
@@ -60,12 +60,10 @@ export default function CaregiverProfileScreen() {
     );
   }, [caregiverName, confirmPassword, currentPassword, name, newPassword, profile, username]);
 
-  useEffect(() => navigation.addListener("beforeRemove", (event) => {
-    if (!hasUnsavedChanges || allowRemove) return;
-    event.preventDefault();
-    pendingRemoveAction.current = () => navigation.dispatch(event.data.action);
+  usePreventRemove(hasUnsavedChanges && !allowRemove, ({ repeat }) => {
+    pendingRemoveAction.current = repeat;
     setIsConfirmationVisible(true);
-  }), [allowRemove, hasUnsavedChanges, navigation]);
+  });
 
   useEffect(() => {
     if (!allowRemove || !pendingRemoveAction.current) return;

@@ -8,9 +8,10 @@ import { Radii, Spacing } from "../../constants/ui";
 interface Props {
   visible: boolean;
   onDismiss: () => void;
+  anomalyType?: string | null;
 }
 
-export function FaceAnomalyBanner({ visible, onDismiss }: Props) {
+export function FaceAnomalyBanner({ visible, onDismiss, anomalyType }: Props) {
   if (!visible) {
     return null;
   }
@@ -27,11 +28,12 @@ export function FaceAnomalyBanner({ visible, onDismiss }: Props) {
       </View>
 
       <View style={styles.textBox}>
-        <Text style={styles.title}>Area wajah perlu diperiksa</Text>
+        <Text style={styles.title}>Wajah bayi tertutupi!</Text>
 
         <Text style={styles.sub}>
-          Sistem mendeteksi ada objek di area wajah bayi. Periksa posisi bayi
-          dan pastikan wajah tetap terlihat.
+          {anomalyType
+            ? `Singkirkan ${anomalyType} dari area wajah bayi.`
+            : "Singkirkan benda dari area wajah bayi."}
         </Text>
       </View>
 
@@ -54,11 +56,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.md,
-    backgroundColor: Colors.warningDark,
+    backgroundColor: Colors.critical,
     borderRadius: Radii.card,
     padding: Spacing.cardPadding,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.warningDark,
+    borderLeftColor: Colors.criticalDark,
   },
 
   iconBox: {

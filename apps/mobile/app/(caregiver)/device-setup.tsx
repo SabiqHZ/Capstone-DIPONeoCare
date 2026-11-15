@@ -33,7 +33,9 @@ export default function DeviceSetupScreen() {
 
   const [ssid, setSsid] = useState("");
   const [password, setPassword] = useState("");
-  const [focusedField, setFocusedField] = useState<"ssid" | "password" | null>(null);
+  const [focusedField, setFocusedField] = useState<"ssid" | "password" | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
@@ -47,12 +49,19 @@ export default function DeviceSetupScreen() {
     setScanError("");
 
     if (Platform.OS !== "android") {
-      setScanError("Pemindaian otomatis hanya tersedia di Android. Masukkan nama Wi-Fi secara manual.");
+      setScanError(
+        "Pemindaian otomatis hanya tersedia di Android. Masukkan nama Wi-Fi secara manual.",
+      );
       return;
     }
 
-    if (!WifiManager || typeof WifiManager.reScanAndLoadWifiList !== "function") {
-      setScanError("Pemindaian memerlukan aplikasi Android hasil build baru. Masukkan nama Wi-Fi secara manual untuk sementara.");
+    if (
+      !WifiManager ||
+      typeof WifiManager.reScanAndLoadWifiList !== "function"
+    ) {
+      setScanError(
+        "Pemindaian memerlukan aplikasi Android hasil build baru. Masukkan nama Wi-Fi secara manual untuk sementara.",
+      );
       return;
     }
 
@@ -62,14 +71,17 @@ export default function DeviceSetupScreen() {
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
           title: "Izin lokasi diperlukan",
-          message: "Android memerlukan izin lokasi untuk memindai jaringan Wi-Fi di sekitar.",
+          message:
+            "Android memerlukan izin lokasi untuk memindai jaringan Wi-Fi di sekitar.",
           buttonNegative: "Nanti",
           buttonPositive: "Izinkan",
         },
       );
       if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
         setAvailableNetworks([]);
-        setScanError("Izin lokasi tidak diberikan. Nama Wi-Fi tetap dapat dimasukkan secara manual.");
+        setScanError(
+          "Izin lokasi tidak diberikan. Nama Wi-Fi tetap dapat dimasukkan secara manual.",
+        );
         return;
       }
 
@@ -86,24 +98,34 @@ export default function DeviceSetupScreen() {
       );
       setAvailableNetworks(sortedNetworks);
       if (sortedNetworks.length === 0) {
-        setScanError("Tidak ada jaringan Wi-Fi ditemukan. Anda dapat memasukkan nama Wi-Fi secara manual.");
+        setScanError(
+          "Tidak ada jaringan Wi-Fi ditemukan. Anda dapat memasukkan nama Wi-Fi secara manual.",
+        );
       }
     } catch (error) {
       setAvailableNetworks([]);
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("locationServicesOff")) {
-        setScanError("Layanan lokasi perangkat sedang mati. Aktifkan lokasi lalu pindai ulang, atau masukkan nama Wi-Fi secara manual.");
+        setScanError(
+          "Layanan lokasi perangkat sedang mati. Aktifkan lokasi lalu pindai ulang, atau masukkan nama Wi-Fi secara manual.",
+        );
       } else if (message.includes("couldNotScan")) {
-        setScanError("Pemindaian Wi-Fi dibatasi sementara oleh Android. Coba pindai lagi sebentar lagi atau masukkan nama Wi-Fi secara manual.");
+        setScanError(
+          "Pemindaian Wi-Fi dibatasi sementara oleh Android. Coba pindai lagi sebentar lagi atau masukkan nama Wi-Fi secara manual.",
+        );
       } else if (
         message.includes("Native module") ||
         message.includes("undefined") ||
         message.includes("is not a function")
       ) {
-        setScanError("Pemindaian memerlukan aplikasi Android hasil build baru. Masukkan nama Wi-Fi secara manual untuk sementara.");
+        setScanError(
+          "Pemindaian memerlukan aplikasi Android hasil build baru. Masukkan nama Wi-Fi secara manual untuk sementara.",
+        );
       } else {
         console.error("[DeviceSetup] Gagal memindai Wi-Fi:", error);
-        setScanError("Jaringan Wi-Fi gagal dipindai. Anda dapat mencoba lagi atau memasukkan nama Wi-Fi secara manual.");
+        setScanError(
+          "Jaringan Wi-Fi gagal dipindai. Anda dapat mencoba lagi atau memasukkan nama Wi-Fi secara manual.",
+        );
       }
     } finally {
       setIsScanningNetworks(false);
@@ -164,9 +186,19 @@ export default function DeviceSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+    <SafeAreaView
+      style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+    >
       {/* Header */}
-      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
+      <View
+        style={[
+          styles.header,
+          isDark && {
+            backgroundColor: "#1F2937",
+            borderBottomColor: "#374151",
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backBtn}
@@ -181,7 +213,9 @@ export default function DeviceSetupScreen() {
             color={isDark ? "#BFDBFE" : Colors.secondaryDark}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>Konfigurasi Kamera Baru</Text>
+        <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>
+          Konfigurasi Kamera Baru
+        </Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -198,31 +232,50 @@ export default function DeviceSetupScreen() {
         }
       >
         {/* Step 1: Instruksi Koneksi Fisik */}
-        <View style={[styles.stepCard, isDark && { backgroundColor: "#1F2937" }, step === 2 && styles.stepCardDimmed]}>
+        <View
+          style={[
+            styles.stepCard,
+            isDark && { backgroundColor: "#1F2937" },
+            step === 2 && styles.stepCardDimmed,
+          ]}
+        >
           <View style={styles.stepHeader}>
             <View style={styles.stepCircle}>
               <Text style={styles.stepCircleText}>1</Text>
             </View>
-            <Text style={[styles.stepTitle, isDark && { color: "#F9FAFB" }]}>Hubungkan ke Kamera</Text>
+            <Text style={[styles.stepTitle, isDark && { color: "#F9FAFB" }]}>
+              Hubungkan ke Kamera
+            </Text>
           </View>
 
-          <Text style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}>
+          <Text
+            style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+          >
             1. Nyalakan perangkat kamera Smart Vision. Tunggu hingga lampu
             berkedip.
           </Text>
-          <Text style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}>
+          <Text
+            style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+          >
             2. Buka Pengaturan Wi-Fi di ponsel Anda.
           </Text>
-          <Text style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}>
+          <Text
+            style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+          >
             3. Cari dan hubungkan ke jaringan Wi-Fi bernama{" "}
-            <Text style={styles.bold}>"SmartVision_Setup"</Text>.
+            <Text style={styles.bold}>"DIPONeoCare-Setup-FB5C"</Text>.
           </Text>
-          <Text style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}>
+          <Text
+            style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+          >
             4. Setelah terhubung, kembali ke aplikasi ini.
           </Text>
 
           {step === 1 && (
-            <TouchableOpacity style={styles.nextBtn} onPress={() => void scanNearbyNetworks()}>
+            <TouchableOpacity
+              style={styles.nextBtn}
+              onPress={() => void scanNearbyNetworks()}
+            >
               <Text style={styles.nextBtnText}>Saya Sudah Terhubung</Text>
               <Icon
                 name="arrow-forward"
@@ -236,15 +289,21 @@ export default function DeviceSetupScreen() {
 
         {/* Step 2: Input Kredensial */}
         {step === 2 && (
-          <View style={[styles.stepCard, isDark && { backgroundColor: "#1F2937" }]}>
+          <View
+            style={[styles.stepCard, isDark && { backgroundColor: "#1F2937" }]}
+          >
             <View style={styles.stepHeader}>
               <View style={styles.stepCircle}>
                 <Text style={styles.stepCircleText}>2</Text>
               </View>
-              <Text style={[styles.stepTitle, isDark && { color: "#F9FAFB" }]}>Masukkan Wi-Fi Daycare</Text>
+              <Text style={[styles.stepTitle, isDark && { color: "#F9FAFB" }]}>
+                Masukkan Wi-Fi Daycare
+              </Text>
             </View>
 
-            <Text style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}>
+            <Text
+              style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+            >
               Masukkan nama jaringan Wi-Fi dan kata sandi klinik/daycare agar
               kamera bisa terhubung ke internet.
             </Text>
@@ -254,8 +313,13 @@ export default function DeviceSetupScreen() {
                 <View style={styles.networkScanSection}>
                   {isScanningNetworks ? (
                     <View style={styles.scanStatus}>
-                      <ActivityIndicator size="small" color={Colors.secondary} />
-                      <Text style={styles.scanMessage}>Memindai Wi-Fi di sekitar...</Text>
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.secondary}
+                      />
+                      <Text style={styles.scanMessage}>
+                        Memindai Wi-Fi di sekitar...
+                      </Text>
                     </View>
                   ) : scanError ? (
                     <Text style={styles.scanError}>{scanError}</Text>
@@ -271,9 +335,24 @@ export default function DeviceSetupScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Pilih jaringan ${network.SSID}`}
                     >
-                      <Icon name="wifi" library="ionicons" size={18} color={Colors.secondary} />
-                      <Text style={[styles.networkName, isDark && { color: "#F9FAFB" }]} numberOfLines={1}>{network.SSID}</Text>
-                      <Text style={styles.networkSignal}>{network.level} dBm</Text>
+                      <Icon
+                        name="wifi"
+                        library="ionicons"
+                        size={18}
+                        color={Colors.secondary}
+                      />
+                      <Text
+                        style={[
+                          styles.networkName,
+                          isDark && { color: "#F9FAFB" },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {network.SSID}
+                      </Text>
+                      <Text style={styles.networkSignal}>
+                        {network.level} dBm
+                      </Text>
                     </TouchableOpacity>
                   ))}
                   {!isScanningNetworks ? (
@@ -282,19 +361,56 @@ export default function DeviceSetupScreen() {
                       onPress={() => void scanNearbyNetworks()}
                       accessibilityRole="button"
                     >
-                      <Icon name="refresh" library="ionicons" size={16} color={Colors.secondaryDark} />
+                      <Icon
+                        name="refresh"
+                        library="ionicons"
+                        size={16}
+                        color={Colors.secondaryDark}
+                      />
                       <Text style={styles.rescanText}>Pindai ulang</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
               ) : (
                 <Text style={styles.scanMessage}>
-                  Pemindaian otomatis tidak tersedia di iOS. Masukkan nama Wi-Fi secara manual.
+                  Pemindaian otomatis tidak tersedia di iOS. Masukkan nama Wi-Fi
+                  secara manual.
                 </Text>
               )}
               <View style={styles.outlinedField}>
-                <Text style={[styles.label, { color: focusedField === "ssid" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.backgroundNurse }]}>Nama jaringan Wi-Fi</Text>
-                <View style={[styles.inputBox, { borderColor: focusedField === "ssid" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: focusedField === "ssid" ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}>
+                <Text
+                  style={[
+                    styles.label,
+                    {
+                      color:
+                        focusedField === "ssid"
+                          ? Colors.secondary
+                          : isDark
+                            ? "#4B5563"
+                            : Colors.border,
+                      backgroundColor: isDark
+                        ? "#111827"
+                        : Colors.backgroundNurse,
+                    },
+                  ]}
+                >
+                  Nama jaringan Wi-Fi
+                </Text>
+                <View
+                  style={[
+                    styles.inputBox,
+                    {
+                      borderColor:
+                        focusedField === "ssid"
+                          ? Colors.secondary
+                          : isDark
+                            ? "#4B5563"
+                            : Colors.border,
+                      borderWidth: focusedField === "ssid" ? 2 : 1,
+                    },
+                    isDark && { backgroundColor: "#111827" },
+                  ]}
+                >
                   <Icon
                     name="wifi"
                     library="ionicons"
@@ -316,8 +432,39 @@ export default function DeviceSetupScreen() {
 
             <View style={styles.formGroup}>
               <View style={styles.outlinedField}>
-                <Text style={[styles.label, { color: focusedField === "password" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.backgroundNurse }]}>Kata sandi Wi-Fi</Text>
-                <View style={[styles.inputBox, { borderColor: focusedField === "password" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: focusedField === "password" ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}>
+                <Text
+                  style={[
+                    styles.label,
+                    {
+                      color:
+                        focusedField === "password"
+                          ? Colors.secondary
+                          : isDark
+                            ? "#4B5563"
+                            : Colors.border,
+                      backgroundColor: isDark
+                        ? "#111827"
+                        : Colors.backgroundNurse,
+                    },
+                  ]}
+                >
+                  Kata sandi Wi-Fi
+                </Text>
+                <View
+                  style={[
+                    styles.inputBox,
+                    {
+                      borderColor:
+                        focusedField === "password"
+                          ? Colors.secondary
+                          : isDark
+                            ? "#4B5563"
+                            : Colors.border,
+                      borderWidth: focusedField === "password" ? 2 : 1,
+                    },
+                    isDark && { backgroundColor: "#111827" },
+                  ]}
+                >
                   <Icon
                     name="lock-closed-outline"
                     library="ionicons"
@@ -353,9 +500,7 @@ export default function DeviceSetupScreen() {
                     size={20}
                     color={Colors.white}
                   />
-                  <Text style={styles.submitBtnText}>
-                    Kirim Konfigurasi ke Kamera
-                  </Text>
+                  <Text style={styles.submitBtnText}>Kirim Konfigurasi</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -392,7 +537,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  backBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     ...Typography.h2,
     color: Colors.secondaryDark,
@@ -469,14 +619,41 @@ const styles = StyleSheet.create({
   },
   outlinedField: { position: "relative", paddingTop: 8 },
   networkScanSection: { gap: 8 },
-  scanStatus: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  scanStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
   scanMessage: { ...Typography.caption, color: Colors.textMuted },
-  scanError: { ...Typography.caption, color: Colors.warningDark, lineHeight: 18 },
-  networkOption: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, borderRadius: Radii.control, backgroundColor: Colors.white },
-  networkOptionSelected: { borderWidth: 1, borderColor: Colors.secondary, backgroundColor: Colors.secondaryLight },
+  scanError: {
+    ...Typography.caption,
+    color: Colors.warningDark,
+    lineHeight: 18,
+  },
+  networkOption: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    borderRadius: Radii.control,
+    backgroundColor: Colors.white,
+  },
+  networkOptionSelected: {
+    borderWidth: 1,
+    borderColor: Colors.secondary,
+    backgroundColor: Colors.secondaryLight,
+  },
   networkName: { ...Typography.body, flex: 1, color: Colors.textPrimary },
   networkSignal: { ...Typography.caption, color: Colors.textMuted },
-  rescanButton: { minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  rescanButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
   rescanText: { ...Typography.captionStrong, color: Colors.secondaryDark },
   label: {
     fontFamily: Fonts.interSemiBold,

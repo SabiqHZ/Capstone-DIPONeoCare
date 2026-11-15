@@ -1,22 +1,31 @@
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { ComponentProps } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import { useAuthStore } from "../../stores/auth.store";
 import { reportService } from "../../services/report.service";
 import { DailyReport, ReportHistoryItem } from "../../types";
 import { Colors } from "../../constants/colors";
-import { Typography } from "../../constants/fonts";
+import { formatDurationMinutes } from "../../utils/duration";
+import { Fonts, Typography } from "../../constants/fonts";
 import { Radii, Spacing } from "../../constants/ui";
 import { useTheme } from "../../context/ThemeContext";
+
+const Text = ({ style, ...props }: ComponentProps<typeof NativeText>) => (
+  <NativeText
+    {...props}
+    style={[{ fontFamily: Fonts.poppinsRegular }, style]}
+  />
+);
 
 export default function ReportScreen() {
   const { isDark } = useTheme();
@@ -25,6 +34,10 @@ export default function ReportScreen() {
   );
 
   const [report, setReport] = useState<DailyReport | null>(null);
+  const [previousReport, setPreviousReport] = useState<DailyReport | null>(
+    null,
+  );
+  const [isPreviousReportLoading, setIsPreviousReportLoading] = useState(true);
   const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isHistoryError, setIsHistoryError] = useState(false);
@@ -58,6 +71,36 @@ export default function ReportScreen() {
       setIsRefreshing(false);
     }
   }, [babyId, selectedDate]);
+
+  const previousDate = useMemo(() => {
+    const [year, month, day] = selectedDate.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day - 1))
+      .toISOString()
+      .slice(0, 10);
+  }, [selectedDate]);
+
+  const fetchPreviousReport = useCallback(async () => {
+    if (!babyId) {
+      setPreviousReport(null);
+      setIsPreviousReportLoading(false);
+      return;
+    }
+
+    setIsPreviousReportLoading(true);
+    setPreviousReport(null);
+    try {
+      const data = await reportService.getDailyReport(babyId, previousDate);
+      setPreviousReport(data ?? null);
+    } catch (error) {
+      console.warn(
+        "[ParentReport] Data hari sebelumnya tidak tersedia:",
+        error,
+      );
+      setPreviousReport(null);
+    } finally {
+      setIsPreviousReportLoading(false);
+    }
+  }, [babyId, previousDate]);
   const fetchReportHistory = useCallback(async () => {
     if (!babyId) {
       setReportHistory([]);
@@ -89,6 +132,10 @@ export default function ReportScreen() {
     void fetchReportHistory();
   }, [fetchReportHistory]);
 
+  useEffect(() => {
+    void fetchPreviousReport();
+  }, [fetchPreviousReport]);
+
   const goDay = (dir: -1 | 1) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + dir);
@@ -119,7 +166,15 @@ export default function ReportScreen() {
 
   const dailyMacro = useMemo(() => {
     if (!report) {
-      return { sleepPct: 0, awakePct: 0, cryingPct: 0 };
+      return {
+        sleepMinutes: 0,
+        awakeMinutes: 0,
+        cryingMinutes: 0,
+        totalMinutes: 0,
+        sleepPct: 0,
+        awakePct: 0,
+        cryingPct: 0,
+      };
     }
 
     let sleep = 0;
@@ -132,34 +187,49 @@ export default function ReportScreen() {
       crying += hour.cryingMinutes;
     }
 
-    return calculateSegments(sleep, awake, crying);
+    return {
+      sleepMinutes: sleep,
+      awakeMinutes: awake,
+      cryingMinutes: crying,
+      totalMinutes: sleep + awake + crying,
+      ...calculateSegments(sleep, awake, crying),
+    };
   }, [report]);
 
-  const dailyInsight = useMemo(() => {
-    if (!report) return null;
-    const totals = [
-      { label: "Tidur", value: report.totalSleepMinutes },
-      { label: "Bangun", value: report.totalAwakeMinutes },
-      { label: "Menangis", value: report.totalCryingMinutes },
-    ];
-    const top = totals.reduce((best, item) => item.value > best.value ? item : best);
-    if (top.value <= 0) return "Belum ada aktivitas yang tercatat untuk hari ini.";
-    return `${top.label} menjadi aktivitas terbanyak hari ini · ${formatDuration(top.value)} tercatat.`;
-  }, [report]);
+  const hasReportData = (value: DailyReport | null) =>
+    Boolean(
+      value?.hourlyActivities.some(
+        (hour) =>
+          hour.sleepMinutes + hour.awakeMinutes + hour.cryingMinutes > 0,
+      ),
+    );
 
-  const formatDuration = (minutes: number) => {
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
+  const comparisonText = (current: number, previous: number) => {
+    if (isPreviousReportLoading) return "Membandingkan dengan kemarin…";
+    if (!hasReportData(report)) return "Belum ada data hari ini";
+    if (!hasReportData(previousReport)) return "Belum ada data pembanding";
 
-    if (h > 0) {
-      return `${h}j ${m}m`;
-    }
-
-    return `${m}m`;
+    const difference = current - previous;
+    if (difference === 0) return "Sama seperti kemarin";
+    return `${difference > 0 ? "+" : "−"}${formatDuration(Math.abs(difference))} dari kemarin`;
   };
 
+  const eventComparisonText = (current: number, previous: number) => {
+    if (isPreviousReportLoading) return "Membandingkan dengan kemarin…";
+    if (!hasReportData(report)) return "Belum ada data hari ini";
+    if (!hasReportData(previousReport)) return "Belum ada data pembanding";
+
+    const difference = current - previous;
+    if (difference === 0) return "Sama seperti kemarin";
+    return `${difference > 0 ? "+" : "−"}${Math.abs(difference)} kejadian dari kemarin`;
+  };
+
+  const formatDuration = formatDurationMinutes;
+
   return (
-    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+    <SafeAreaView
+      style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+    >
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -168,15 +238,23 @@ export default function ReportScreen() {
             refreshing={isRefreshing}
             onRefresh={() => {
               setIsRefreshing(true);
-              void Promise.all([fetchReport(), fetchReportHistory()]);
+              void Promise.all([
+                fetchReport(),
+                fetchReportHistory(),
+                fetchPreviousReport(),
+              ]);
             }}
             colors={["#1D9E75"]}
           />
         }
       >
-        <Text style={[styles.title, isDark && { color: "#A7F3D0" }]}>Laporan Harian</Text>
+        <Text style={[styles.title, isDark && { color: "#A7F3D0" }]}>
+          Laporan Harian
+        </Text>
 
-        <View style={[styles.datePicker, isDark && { backgroundColor: "#1F2937" }]}>
+        <View
+          style={[styles.datePicker, isDark && { backgroundColor: "#1F2937" }]}
+        >
           <TouchableOpacity
             onPress={() => goDay(-1)}
             style={styles.dateBtn}
@@ -265,43 +343,85 @@ export default function ReportScreen() {
         ) : (
           <>
             <View style={styles.summaryGrid}>
-              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
+              <View
+                style={[
+                  styles.summaryCard,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
                 <Text style={[styles.summaryValue, styles.sleepValue]}>
                   {formatDuration(report.totalSleepMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Tidur</Text>
+                <Text style={styles.summaryComparison}>
+                  {comparisonText(
+                    report.totalSleepMinutes,
+                    previousReport?.totalSleepMinutes ?? 0,
+                  )}
+                </Text>
               </View>
 
-              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
+              <View
+                style={[
+                  styles.summaryCard,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
                 <Text style={[styles.summaryValue, styles.awakeValue]}>
                   {formatDuration(report.totalAwakeMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Bangun</Text>
+                <Text style={styles.summaryComparison}>
+                  {comparisonText(
+                    report.totalAwakeMinutes,
+                    previousReport?.totalAwakeMinutes ?? 0,
+                  )}
+                </Text>
               </View>
 
-              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
+              <View
+                style={[
+                  styles.summaryCard,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
                 <Text style={[styles.summaryValue, styles.cryingValue]}>
                   {formatDuration(report.totalCryingMinutes)}
                 </Text>
                 <Text style={styles.summaryLabel}>Total Menangis</Text>
+                <Text style={styles.summaryComparison}>
+                  {comparisonText(
+                    report.totalCryingMinutes,
+                    previousReport?.totalCryingMinutes ?? 0,
+                  )}
+                </Text>
               </View>
 
-              <View style={[styles.summaryCard, isDark && { backgroundColor: "#1F2937" }]}>
+              <View
+                style={[
+                  styles.summaryCard,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
                 <Text style={styles.summaryValue}>
                   {report.totalCryingEvents}
                 </Text>
                 <Text style={styles.summaryLabel}>Kejadian Menangis</Text>
+                <Text style={styles.summaryComparison}>
+                  {eventComparisonText(
+                    report.totalCryingEvents,
+                    previousReport?.totalCryingEvents ?? 0,
+                  )}
+                </Text>
               </View>
             </View>
 
-            {dailyInsight ? (
-            <View style={[styles.insightCard, isDark && { backgroundColor: "#1F2937" }]}>
-                <Text style={styles.insightLabel}>Ringkasan</Text>
-                <Text style={styles.insightText}>{dailyInsight}</Text>
-              </View>
-            ) : null}
-
-            <View style={[styles.historyCard, isDark && { backgroundColor: "#1F2937" }]}>
+            <View
+              style={[
+                styles.historyCard,
+                isDark && { backgroundColor: "#1F2937" },
+              ]}
+            >
               <View style={styles.historyHeader}>
                 <Text style={styles.historyTitle}>Riwayat Laporan</Text>
                 <Text style={styles.historySubtitle}>
@@ -371,7 +491,12 @@ export default function ReportScreen() {
                           )}
                         </Text>
 
-                        <Text style={[styles.historyMeta, isSelected && styles.historyMetaSelected]}>
+                        <Text
+                          style={[
+                            styles.historyMeta,
+                            isSelected && styles.historyMetaSelected,
+                          ]}
+                        >
                           Tidur {formatDuration(item.total_sleep_minutes)}
                         </Text>
                       </TouchableOpacity>
@@ -381,44 +506,86 @@ export default function ReportScreen() {
               )}
             </View>
 
-            <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }]}>
-              <Text style={styles.chartTitle}>Alokasi Aktivitas Harian</Text>
+            <View
+              style={[
+                styles.chartCard,
+                isDark && { backgroundColor: "#1F2937" },
+              ]}
+            >
+              <Text style={styles.chartTitle}>Distribusi Aktivitas Harian</Text>
+              <Text style={styles.chartSubtitle}>
+                Proporsi dari durasi aktivitas yang tercatat
+              </Text>
 
-              <View style={styles.stackedBarContainer}>
-                <View style={styles.macroTrack}>
-                  {dailyMacro.sleepPct > 0 && (
-                    <View
-                      style={[
-                        styles.macroSeg,
-                        {
-                          flex: dailyMacro.sleepPct,
-                          backgroundColor: Colors.success,
-                        },
-                      ]}
+              <View style={styles.donutContent}>
+                <View style={styles.donutWrap}>
+                  <Svg width={160} height={160} viewBox="0 0 160 160">
+                    <Circle
+                      cx={80}
+                      cy={80}
+                      r={54}
+                      fill="none"
+                      stroke={isDark ? "#374151" : "#E5E7EB"}
+                      strokeWidth={20}
                     />
-                  )}
-                  {dailyMacro.awakePct > 0 && (
-                    <View
+                    {dailyMacro.totalMinutes > 0 ? (
+                      <>
+                        <Circle
+                          cx={80}
+                          cy={80}
+                          r={54}
+                          fill="none"
+                          stroke={Colors.success}
+                          strokeWidth={20}
+                          strokeDasharray={`${(2 * Math.PI * 54 * dailyMacro.sleepPct) / 100} ${2 * Math.PI * 54}`}
+                          transform="rotate(-90 80 80)"
+                        />
+                        <Circle
+                          cx={80}
+                          cy={80}
+                          r={54}
+                          fill="none"
+                          stroke={Colors.info}
+                          strokeWidth={20}
+                          strokeDasharray={`${(2 * Math.PI * 54 * dailyMacro.awakePct) / 100} ${2 * Math.PI * 54}`}
+                          strokeDashoffset={
+                            -(2 * Math.PI * 54 * dailyMacro.sleepPct) / 100
+                          }
+                          transform="rotate(-90 80 80)"
+                        />
+                        <Circle
+                          cx={80}
+                          cy={80}
+                          r={54}
+                          fill="none"
+                          stroke={Colors.critical}
+                          strokeWidth={20}
+                          strokeDasharray={`${(2 * Math.PI * 54 * dailyMacro.cryingPct) / 100} ${2 * Math.PI * 54}`}
+                          strokeDashoffset={
+                            (-2 *
+                              Math.PI *
+                              54 *
+                              (dailyMacro.sleepPct + dailyMacro.awakePct)) /
+                            100
+                          }
+                          transform="rotate(-90 80 80)"
+                        />
+                      </>
+                    ) : null}
+                  </Svg>
+                  <View style={styles.donutCenter}>
+                    <Text
                       style={[
-                        styles.macroSeg,
-                        {
-                          flex: dailyMacro.awakePct,
-                          backgroundColor: Colors.info,
-                        },
+                        styles.donutTotal,
+                        isDark && { color: "#F9FAFB" },
                       ]}
-                    />
-                  )}
-                  {dailyMacro.cryingPct > 0 && (
-                    <View
-                      style={[
-                        styles.macroSeg,
-                        {
-                          flex: dailyMacro.cryingPct,
-                          backgroundColor: Colors.critical,
-                        },
-                      ]}
-                    />
-                  )}
+                    >
+                      {dailyMacro.totalMinutes > 0
+                        ? formatDuration(dailyMacro.totalMinutes)
+                        : "—"}
+                    </Text>
+                    <Text style={styles.donutCaption}>tercatat</Text>
+                  </View>
                 </View>
 
                 <View style={styles.macroLegend}>
@@ -439,89 +606,6 @@ export default function ReportScreen() {
                   />
                 </View>
               </View>
-            </View>
-
-            <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }]}>
-              <Text style={styles.chartTitle}>
-                Analisis Distribusi per Jam (00:00 - 24:00)
-              </Text>
-
-              {report.hourlyActivities
-                .filter(
-                  (hour) =>
-                    hour.sleepMinutes + hour.awakeMinutes + hour.cryingMinutes >
-                    0,
-                )
-                .map((hour) => {
-                  const segments = calculateSegments(
-                    hour.sleepMinutes,
-                    hour.awakeMinutes,
-                    hour.cryingMinutes,
-                  );
-
-                  const totalRecorded =
-                    hour.sleepMinutes + hour.awakeMinutes + hour.cryingMinutes;
-
-                  return (
-                    <View key={hour.hour} style={styles.hourlyBlock}>
-                      <View style={styles.hourlyRow}>
-                        <Text style={styles.hourLabel}>
-                          {hour.hour.toString().padStart(2, "0")}:00
-                        </Text>
-
-                        <View style={styles.hourlyTrack}>
-                          {segments.sleepPct > 0 && (
-                            <View
-                              style={[
-                                styles.barSeg,
-                                {
-                                  flex: hour.sleepMinutes,
-                                  backgroundColor: Colors.success,
-                                },
-                              ]}
-                            />
-                          )}
-                          {segments.awakePct > 0 && (
-                            <View
-                              style={[
-                                styles.barSeg,
-                                {
-                                  flex: hour.awakeMinutes,
-                                  backgroundColor: Colors.info,
-                                },
-                              ]}
-                            />
-                          )}
-                          {segments.cryingPct > 0 && (
-                            <View
-                              style={[
-                                styles.barSeg,
-                                {
-                                  flex: hour.cryingMinutes,
-                                  backgroundColor: Colors.critical,
-                                },
-                              ]}
-                            />
-                          )}
-                        </View>
-
-                        <Text style={styles.hourTotal}>
-                          {Math.round(totalRecorded)}m
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-
-              {report.hourlyActivities.every(
-                (hour) =>
-                  hour.sleepMinutes + hour.awakeMinutes + hour.cryingMinutes ===
-                  0,
-              ) && (
-                <Text style={styles.noDataText}>
-                  Belum ada aktivitas yang terekam pada tanggal ini.
-                </Text>
-              )}
             </View>
           </>
         )}
@@ -561,7 +645,12 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
 
-  dateBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  dateBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dateCenter: { flex: 1, alignItems: "center" },
   dateText: { fontSize: 13, fontWeight: "600", color: "#374151" },
   centerBox: { alignItems: "center", paddingVertical: 80 },
@@ -597,6 +686,12 @@ const styles = StyleSheet.create({
   awakeValue: { color: Colors.info },
   cryingValue: { color: Colors.criticalDark },
   summaryLabel: { marginTop: 4, fontSize: 12, color: "#6B7280" },
+  summaryComparison: {
+    marginTop: 6,
+    fontSize: 10,
+    lineHeight: 14,
+    color: "#6B7280",
+  },
   historyCard: {
     backgroundColor: "#fff",
     borderRadius: Radii.card,
@@ -604,14 +699,6 @@ const styles = StyleSheet.create({
     gap: 12,
     elevation: 1,
   },
-  insightCard: {
-    backgroundColor: Colors.successLight,
-    borderRadius: Radii.card,
-    padding: Spacing.cardPadding,
-    gap: Spacing.xs,
-  },
-  insightLabel: { ...Typography.captionStrong, color: Colors.successDark },
-  insightText: { ...Typography.body, color: Colors.textPrimary, lineHeight: 21 },
   historyHeader: {
     gap: 3,
   },
@@ -677,52 +764,39 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   chartTitle: { ...Typography.bodyStrong, color: "#111827" },
-  stackedBarContainer: { gap: 12 },
-  macroTrack: {
-    height: 32,
-    borderRadius: 8,
+  chartSubtitle: { ...Typography.caption, color: "#6B7280", marginTop: -10 },
+  donutContent: {
     flexDirection: "row",
-    overflow: "hidden",
-    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
-  macroSeg: { height: "100%" },
+  donutWrap: {
+    width: 160,
+    height: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  donutCenter: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  donutTotal: {
+    ...Typography.bodyStrong,
+    color: "#111827",
+  },
+  donutCaption: {
+    ...Typography.caption,
+    color: "#6B7280",
+  },
   macroLegend: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
+    flex: 1,
+    gap: 14,
   },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11, color: "#6B7280" },
   legendPct: { fontWeight: "700", color: "#374151" },
-  hourlyBlock: { marginVertical: 6, gap: 4 },
-  hourlyRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  hourLabel: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    width: 35,
-    fontWeight: "600",
-  },
-  hourlyTrack: {
-    flex: 1,
-    height: 14,
-    borderRadius: 7,
-    flexDirection: "row",
-    overflow: "hidden",
-    backgroundColor: "#F3F4F6",
-  },
-  barSeg: { height: "100%" },
-  hourTotal: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    width: 40,
-    textAlign: "right",
-    fontWeight: "600",
-  },
-  noDataText: {
-    fontSize: 12,
-    color: "#6B7280",
-    textAlign: "center",
-    paddingVertical: 16,
-  },
 });

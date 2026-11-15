@@ -3,6 +3,7 @@ import { AuthRequest } from "../types";
 import { aiDispatchService } from "../services/ai-dispatch.service";
 import { deviceService } from "../services/device.service";
 import { deviceStreamService } from "../services/device-stream.service";
+import { inferenceService } from "../services/inference.service";
 import { broadcastBabyStatus } from "../socket/socket.handler";
 import { io } from "../app";
 
@@ -100,7 +101,7 @@ export const deviceController = {
           babyId: device.baby_id,
           unitId: device.unit_id,
           deviceOnline: true,
-          lastUpdated: new Date().toISOString(),
+          deviceLastSeenAt: new Date().toISOString(),
         });
       }
       res.json({
@@ -159,34 +160,24 @@ export const deviceController = {
     try {
       const { macAddress, audioWindowId, startedAt, durationSeconds } =
         req.body;
-      let captureIds: unknown;
-      try {
-        captureIds =
-          typeof req.body.captureIds === "string"
-            ? JSON.parse(req.body.captureIds)
-            : req.body.captureIds;
-      } catch {
-        captureIds = null;
-      }
       const duration = Number(durationSeconds);
       if (
         !req.file ||
-        !macAddress ||
-        !audioWindowId ||
+        typeof macAddress !== "string" ||
+        !macAddress.trim() ||
+        typeof audioWindowId !== "string" ||
+        !audioWindowId.trim() ||
         !isIsoTimestamp(startedAt) ||
-        duration !== 5 ||
-        !Array.isArray(captureIds) ||
-        captureIds.length !== 5 ||
-        captureIds.some((id) => typeof id !== "string" || !id)
+        duration !== 5
       ) {
         res.status(400).json({
           success: false,
           error:
-            "audio, macAddress, audioWindowId, startedAt, durationSeconds=5, dan lima captureIds wajib valid",
+            "audio, macAddress, audioWindowId, startedAt, dan durationSeconds=5 wajib valid",
         });
         return;
       }
-      const device = await deviceService.getDeviceByMac(macAddress);
+      const device = await deviceService.getDeviceByMac(macAddress.trim());
       if (!device?.baby_id) {
         res
           .status(409)
@@ -194,13 +185,18 @@ export const deviceController = {
         return;
       }
 
+      await inferenceService.saveAudioWindow(device, {
+        audioWindowId: audioWindowId.trim(),
+        startedAt: new Date(startedAt).toISOString(),
+        durationSeconds: duration,
+      });
+
       void aiDispatchService
         .dispatch("audio", {
-          macAddress,
-          audioWindowId,
+          macAddress: macAddress.trim(),
+          audioWindowId: audioWindowId.trim(),
           startedAt,
           durationSeconds: duration,
-          captureIds: captureIds as string[],
           file: req.file,
         })
         .catch((error) =>
@@ -208,7 +204,10 @@ export const deviceController = {
         );
       res
         .status(202)
-        .json({ success: true, data: { accepted: true, audioWindowId } });
+        .json({
+          success: true,
+          data: { accepted: true, audioWindowId: audioWindowId.trim() },
+        });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

@@ -56,12 +56,22 @@ function parseVision(body: unknown): VisionResultPayload | null {
 
 function parseAudioResults(
   body: any,
-): { macAddress: string; results: AudioSecondResult[] } | null {
+): {
+  macAddress: string;
+  results: AudioSecondResult[];
+  audioWindowId?: string;
+  startedAt?: string;
+} | null {
   if (
     !body ||
     typeof body.macAddress !== "string" ||
     !Array.isArray(body.results) ||
-    body.results.length !== 5
+    body.results.length !== 5 ||
+    (body.audioWindowId !== undefined &&
+      (typeof body.audioWindowId !== "string" || !body.audioWindowId)) ||
+    (body.startedAt !== undefined &&
+      (typeof body.startedAt !== "string" ||
+        Number.isNaN(Date.parse(body.startedAt))))
   ) {
     return null;
   }
@@ -71,7 +81,10 @@ function parseAudioResults(
   if (
     results.some(
       (item) =>
-        typeof item.captureId !== "string" ||
+        !item ||
+        typeof item !== "object" ||
+        (item.captureId !== undefined &&
+          (typeof item.captureId !== "string" || !item.captureId)) ||
         typeof item.timestamp !== "string" ||
         Number.isNaN(Date.parse(item.timestamp)) ||
         !isFlag(item.isCrying) ||
@@ -88,6 +101,8 @@ function parseAudioResults(
   return {
     macAddress: body.macAddress,
     results,
+    audioWindowId: body.audioWindowId,
+    startedAt: body.startedAt,
   };
 }
 
@@ -163,9 +178,26 @@ export const aiController = {
       }
       await inferenceService.saveVisionResult(device, payload);
       const anomalyAlert = await inferenceService.trackAnomaly(device, payload);
-      const finalized = await inferenceService.finalizeMatches(device, [
-        payload.captureId,
-      ]);
+      const windows = await inferenceService.findAudioWindowsForFrame(
+        device,
+        payload.timestamp,
+      );
+      const finalized = windows.length
+        ? (
+            await Promise.all(
+              windows.map((window) =>
+                inferenceService.finalizeMatches(
+                  device,
+                  window,
+                  payload.timestamp,
+                ),
+              ),
+            )
+          ).flat()
+        : await inferenceService.finalizeVisionResult(
+            device,
+            payload.timestamp,
+          );
       emitFinalized(finalized);
       await emitCryingAlerts(device, finalized);
       if (anomalyAlert) {
@@ -192,7 +224,10 @@ export const aiController = {
     }
   },
 
-  async receiveAudioResults(req: Request, res: Response): Promise<void> {
+  async receiveAudioResults(
+    req: Request,
+    res: Response,
+  ): Promise<void | Response> {
     try {
       const payload = parseAudioResults(req.body);
       if (!payload) {
@@ -210,13 +245,36 @@ export const aiController = {
         return;
       }
       await inferenceService.saveAudioResults(device, payload.results);
-      const finalized = await inferenceService.finalizeMatches(
+      const audioWindow = await inferenceService.findAudioWindowForResults(
         device,
-        payload.results.map((item) => item.captureId),
+        payload.results,
+        {
+          audioWindowId: payload.audioWindowId,
+          startedAt: payload.startedAt,
+        },
       );
+      const finalized = audioWindow
+        ? await inferenceService.finalizeMatches(device, audioWindow)
+        : [];
+      if (!audioWindow) {
+        console.warn(
+          "[AI] Audio result tidak cocok dengan audio window yang tersimpan",
+          { macAddress: payload.macAddress },
+        );
+      }
       emitFinalized(finalized);
       await emitCryingAlerts(device, finalized);
-      res.json({ success: true, data: { finalized: finalized.length } });
+      console.log("[AI audio callback]", {
+        audioWindowId: payload.audioWindowId,
+        startedAt: payload.startedAt,
+        resultCount: payload.results.length,
+        finalized: finalized.length,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: { finalized: finalized.length },
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

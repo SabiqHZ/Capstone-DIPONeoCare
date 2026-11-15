@@ -28,7 +28,12 @@ import { Baby } from "../../types";
 import { MuteToggle } from "../../components/ui/MuteToggle";
 import { ActionButton } from "../../components/ui/ActionButton";
 // INJEKSI REALTIME: Import context
-import { useAllBabyStatuses, useActiveAlerts, useBabyContext } from "../../context/BabyContext";
+import {
+  useAllBabyStatuses,
+  useActiveAlerts,
+  useBabyContext,
+  isBabyDetectionExpired,
+} from "../../context/BabyContext";
 import { ThemeSwitch, useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -65,7 +70,7 @@ const activityLabel: Record<string, string> = {
   sleeping: "Tidur",
   awake: "Bangun",
   crying: "Menangis",
-  unknown: "Menunggu hasil pemantauan",
+  unknown: "Tidak ada bayi yang terdeteksi",
 };
 const activityColor: Record<string, string> = {
   sleeping: Colors.success,
@@ -86,26 +91,36 @@ function BabyCard({
   // INJEKSI REALTIME: Membaca status real-time dari context, fallback ke data statis jika context kosong
   const realtimeStatuses = useAllBabyStatuses();
   const activeStatus = realtimeStatuses[baby.id];
+  const detectionExpired = Boolean(
+    activeStatus?.isDetectionStale ||
+      isBabyDetectionExpired(
+        activeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+      ),
+  );
 
   const isOnline = activeStatus
     ? activeStatus.deviceOnline
     : (baby.devices?.is_online ?? false);
 
-  const isCrying =
-    activeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null;
+  const isCrying = !isOnline || detectionExpired
+    ? null
+    : (activeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
 
-  const activity =
-    activeStatus?.activity ?? baby.baby_statuses?.activity ?? null;
+  const activity = !isOnline || detectionExpired
+    ? null
+    : (activeStatus?.activity ?? baby.baby_statuses?.activity ?? null);
 
-  const faceAnomaly =
-    activeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
+  const faceAnomaly = !isOnline || detectionExpired
+    ? null
+    : (activeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
 
   const faceCovered = faceAnomaly != null && faceAnomaly !== "none";
 
-  const cryingSec =
-    activeStatus?.cryingDurationSec ??
-    baby.baby_statuses?.crying_duration_sec ??
-    null;
+  const cryingSec = !isOnline || detectionExpired
+    ? null
+    : (activeStatus?.cryingDurationSec ??
+      baby.baby_statuses?.crying_duration_sec ??
+      null);
 
   const activityKey = activity ?? "unknown";
 
@@ -126,7 +141,9 @@ function BabyCard({
       onPress={onPress}
       activeOpacity={0.85}
     >
-      <View style={[styles.cardThumb, isDark && { backgroundColor: "#374151" }]}>
+      <View
+        style={[styles.cardThumb, isDark && { backgroundColor: "#374151" }]}
+      >
         <Icon
           name="baby-face-outline"
           library="material"
@@ -135,7 +152,9 @@ function BabyCard({
         />
 
         {faceCovered ? (
-          <View style={[styles.nvPill, { backgroundColor: Colors.warningDark }]}>
+          <View
+            style={[styles.nvPill, { backgroundColor: Colors.warningDark }]}
+          >
             <Icon
               name="eye-off-outline"
               library="ionicons"
@@ -149,7 +168,11 @@ function BabyCard({
         <View
           style={[
             styles.onlinePill,
-            { backgroundColor: isOnline ? Colors.successLight : Colors.offlineLight },
+            {
+              backgroundColor: isOnline
+                ? Colors.successLight
+                : Colors.offlineLight,
+            },
           ]}
         >
           <View
@@ -170,10 +193,15 @@ function BabyCard({
       </View>
 
       <View style={styles.cardInfo}>
-        <Text style={[styles.cardName, isDark && { color: "#F9FAFB" }]} numberOfLines={1}>
+        <Text
+          style={[styles.cardName, isDark && { color: "#F9FAFB" }]}
+          numberOfLines={1}
+        >
           {baby.name}
         </Text>
-        <Text style={[styles.cardBed, isDark && { color: "#9CA3AF" }]}>Tempat tidur {baby.bed_number}</Text>
+        <Text style={[styles.cardBed, isDark && { color: "#9CA3AF" }]}>
+          Tempat tidur {baby.bed_number}
+        </Text>
 
         <View
           style={[
@@ -189,7 +217,11 @@ function BabyCard({
               { color: activityColor[activityKey] },
             ]}
           >
-            {activityLabel[activityKey]}
+          {activityKey === "unknown"
+            ? isOnline
+              ? activityLabel[activityKey]
+              : "Kamera tidak aktif"
+            : activityLabel[activityKey]}
           </Text>
         </View>
 
@@ -210,6 +242,8 @@ function BabyCard({
 
         {faceCovered ? (
           <Text style={styles.faceWarning}>⚠ Wajah tertutup</Text>
+        ) : activityKey === "unknown" ? (
+          <Text style={styles.faceWarning}>Wajah: Tidak ada bayi yang terdeteksi</Text>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -264,7 +298,9 @@ export default function NurseDashboard() {
       const data = await babyService.getBabies();
       setBabies(data as BabyWithStatus[]);
     } catch {
-      setError("Tidak dapat memuat daftar bayi. Periksa koneksi lalu coba lagi.");
+      setError(
+        "Tidak dapat memuat daftar bayi. Periksa koneksi lalu coba lagi.",
+      );
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -273,6 +309,10 @@ export default function NurseDashboard() {
 
   useEffect(() => {
     fetchBabies();
+    const refreshId = setInterval(() => {
+      void fetchBabies();
+    }, 15000);
+    return () => clearInterval(refreshId);
   }, [fetchBabies]);
 
   const handleRefresh = () => {
@@ -284,7 +324,7 @@ export default function NurseDashboard() {
     setIsLoggingOut(true);
     try {
       await logout();
-      router.replace("/(auth)/code-entry");
+      router.replace("/(auth)");
     } catch (error) {
       console.error("[NurseDashboard] Gagal keluar dari akun:", error);
       setIsLogoutConfirmVisible(false);
@@ -306,15 +346,18 @@ export default function NurseDashboard() {
 
     babies.forEach((baby) => {
       const rtStatus = realtimeStatuses[baby.id];
-      const isCry = rtStatus
-        ? rtStatus.isCrying
-        : (baby.baby_statuses?.is_crying ?? false);
-      const isFace = rtStatus
-        ? rtStatus.faceAnomaly !== "none"
-        : Boolean(
-            baby.baby_statuses?.face_anomaly &&
-            baby.baby_statuses.face_anomaly !== "none",
-          );
+      const detectionExpired = Boolean(
+        rtStatus?.isDetectionStale ||
+          isBabyDetectionExpired(
+            rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+          ),
+      );
+      const isCry = !detectionExpired && Boolean(
+        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
+      );
+      const isFace = !detectionExpired && Boolean(
+        rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly,
+      ) && (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly) !== "none";
       const isOn = rtStatus
         ? rtStatus.deviceOnline
         : (baby.devices?.is_online ?? false);
@@ -344,12 +387,19 @@ export default function NurseDashboard() {
       if (activeFilter === "all") return true;
 
       const rtStatus = realtimeStatuses[baby.id];
-      const isCrying =
-        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false;
-      const faceAnomaly =
-        rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
-      const isFaceAnomaly =
-        faceAnomaly != null && faceAnomaly !== "none";
+      const detectionExpired = Boolean(
+        rtStatus?.isDetectionStale ||
+          isBabyDetectionExpired(
+            rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+          ),
+      );
+      const isCrying = !detectionExpired && Boolean(
+        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
+      );
+      const faceAnomaly = detectionExpired
+        ? null
+        : (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
+      const isFaceAnomaly = faceAnomaly != null && faceAnomaly !== "none";
       const isOnline = rtStatus
         ? rtStatus.deviceOnline
         : (baby.devices?.is_online ?? false);
@@ -366,26 +416,32 @@ export default function NurseDashboard() {
     return matchingBabies
       .map((baby, originalIndex) => {
         const rtStatus = realtimeStatuses[baby.id];
-        const isCrying = Boolean(
+        const detectionExpired = Boolean(
+          rtStatus?.isDetectionStale ||
+            isBabyDetectionExpired(
+              rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+            ),
+        );
+        const isCrying = !detectionExpired && Boolean(
           rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
         );
-        const faceAnomaly =
-          rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null;
-        const hasFaceAnomaly =
-          faceAnomaly != null && faceAnomaly !== "none";
-        const priority = isCrying && hasFaceAnomaly
-          ? 3
-          : isCrying
-            ? 2
-            : hasFaceAnomaly
-              ? 1
-              : 0;
+        const faceAnomaly = detectionExpired
+          ? null
+          : (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
+        const hasFaceAnomaly = faceAnomaly != null && faceAnomaly !== "none";
+        const priority =
+          isCrying && hasFaceAnomaly
+            ? 3
+            : isCrying
+              ? 2
+              : hasFaceAnomaly
+                ? 1
+                : 0;
 
         return { baby, originalIndex, priority };
       })
       .sort(
-        (a, b) =>
-          b.priority - a.priority || a.originalIndex - b.originalIndex,
+        (a, b) => b.priority - a.priority || a.originalIndex - b.originalIndex,
       )
       .map(({ baby }) => baby);
   }, [babies, searchQuery, activeFilter, realtimeStatuses]);
@@ -393,8 +449,18 @@ export default function NurseDashboard() {
   if (!user || user.role !== "caregiver") return null;
 
   return (
-    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
-      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
+    <SafeAreaView
+      style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+    >
+      <View
+        style={[
+          styles.header,
+          isDark && {
+            backgroundColor: "#1F2937",
+            borderBottomColor: "#374151",
+          },
+        ]}
+      >
         <TouchableOpacity
           style={styles.headerIconButton}
           onPress={() => setIsMenuVisible(true)}
@@ -414,7 +480,11 @@ export default function NurseDashboard() {
               ],
             }}
           >
-          <Icon name="menu" size={24} color={isDark ? "#F9FAFB" : Colors.textPrimary} />
+            <Icon
+              name="menu"
+              size={24}
+              color={isDark ? "#F9FAFB" : Colors.textPrimary}
+            />
           </Animated.View>
         </TouchableOpacity>
 
@@ -428,7 +498,10 @@ export default function NurseDashboard() {
               }),
               backgroundColor: searchExpansion.interpolate({
                 inputRange: [0, 1],
-                outputRange: ["rgba(230, 241, 251, 0)", isDark ? "#263548" : Colors.secondaryLight],
+                outputRange: [
+                  "rgba(230, 241, 251, 0)",
+                  isDark ? "#263548" : Colors.secondaryLight,
+                ],
               }),
             },
           ]}
@@ -437,7 +510,9 @@ export default function NurseDashboard() {
             style={styles.headerSearchIconButton}
             onPress={() => setIsSearchExpanded((expanded) => !expanded)}
             accessibilityRole="button"
-            accessibilityLabel={isSearchExpanded ? "Tutup pencarian" : "Buka pencarian"}
+            accessibilityLabel={
+              isSearchExpanded ? "Tutup pencarian" : "Buka pencarian"
+            }
             accessibilityState={{ expanded: isSearchExpanded }}
           >
             <Icon name="search-outline" size={23} color={Colors.textMuted} />
@@ -466,7 +541,11 @@ export default function NurseDashboard() {
                   accessibilityRole="button"
                   accessibilityLabel="Hapus pencarian"
                 >
-                  <Icon name="close-circle" size={18} color={Colors.textMuted} />
+                  <Icon
+                    name="close-circle"
+                    size={18}
+                    color={Colors.textMuted}
+                  />
                 </TouchableOpacity>
               ) : null}
             </Animated.View>
@@ -479,7 +558,11 @@ export default function NurseDashboard() {
           accessibilityRole="button"
           accessibilityLabel={`Notifikasi${activeAlerts.length ? `, ${activeAlerts.length} belum ditangani` : ""}`}
         >
-          <Icon name="notifications-outline" size={23} color={isDark ? "#F9FAFB" : Colors.textPrimary} />
+          <Icon
+            name="notifications-outline"
+            size={23}
+            color={isDark ? "#F9FAFB" : Colors.textPrimary}
+          />
           {activeAlerts.length > 0 ? <View style={styles.bellDot} /> : null}
         </TouchableOpacity>
 
@@ -490,43 +573,87 @@ export default function NurseDashboard() {
           accessibilityLabel="Buka menu profil pengasuh"
         >
           <View style={styles.profileAvatar}>
-            <Text style={styles.profileInitial}>{user.name?.trim()?.[0]?.toUpperCase() ?? "P"}</Text>
+            <Text style={styles.profileInitial}>
+              {user.name?.trim()?.[0]?.toUpperCase() ?? "P"}
+            </Text>
           </View>
-          <Icon name="chevron-down" size={16} color={isDark ? "#9CA3AF" : Colors.textMuted} />
+          <Icon
+            name="chevron-down"
+            size={16}
+            color={isDark ? "#9CA3AF" : Colors.textMuted}
+          />
         </TouchableOpacity>
         <ThemeSwitch />
       </View>
 
-      <View style={[styles.summaryBar, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
+      <View
+        style={[
+          styles.summaryBar,
+          isDark && {
+            backgroundColor: "#1F2937",
+            borderBottomColor: "#374151",
+          },
+        ]}
+      >
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNum, isDark && { color: "#F9FAFB" }]}>{babies.length}</Text>
-          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Total Bayi</Text>
+          <Text style={[styles.summaryNum, isDark && { color: "#F9FAFB" }]}>
+            {babies.length}
+          </Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>
+            Total Bayi
+          </Text>
         </View>
-        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
+        <View
+          style={[
+            styles.summaryDivider,
+            isDark && { backgroundColor: "#374151" },
+          ]}
+        />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.success }]}>
             {onlineCount}
           </Text>
-          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Kamera aktif</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>
+            Kamera aktif
+          </Text>
         </View>
-        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
+        <View
+          style={[
+            styles.summaryDivider,
+            isDark && { backgroundColor: "#374151" },
+          ]}
+        />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.critical }]}>
             {cryingCount}
           </Text>
-          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Menangis</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>
+            Menangis
+          </Text>
         </View>
-        <View style={[styles.summaryDivider, isDark && { backgroundColor: "#374151" }]} />
+        <View
+          style={[
+            styles.summaryDivider,
+            isDark && { backgroundColor: "#374151" },
+          ]}
+        />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNum, { color: Colors.warningDark }]}>
             {faceAnomalyCount}
           </Text>
-          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>Perlu diperiksa</Text>
+          <Text style={[styles.summaryLabel, isDark && { color: "#9CA3AF" }]}>
+            Perlu diperiksa
+          </Text>
         </View>
       </View>
 
       {!isLoading && !error && babies.length > 0 ? (
-        <View style={[styles.listControls, isDark && { backgroundColor: "#111827" }]}>
+        <View
+          style={[
+            styles.listControls,
+            isDark && { backgroundColor: "#111827" },
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -540,7 +667,14 @@ export default function NurseDashboard() {
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   onPress={() => setActiveFilter(filter.key)}
-                  style={[styles.filterChip, isDark && { backgroundColor: "#1F2937", borderColor: "#4B5563" }, selected && styles.filterChipActive]}
+                  style={[
+                    styles.filterChip,
+                    isDark && {
+                      backgroundColor: "#1F2937",
+                      borderColor: "#4B5563",
+                    },
+                    selected && styles.filterChipActive,
+                  ]}
                 >
                   <Text
                     style={[
@@ -561,7 +695,9 @@ export default function NurseDashboard() {
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={Colors.secondary} />
-          <Text style={[styles.loadingText, isDark && { color: "#D1D5DB" }]}>Memuat data bayi...</Text>
+          <Text style={[styles.loadingText, isDark && { color: "#D1D5DB" }]}>
+            Memuat data bayi...
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.centerBox}>
@@ -571,7 +707,9 @@ export default function NurseDashboard() {
             size={48}
             color={Colors.textDisabled}
           />
-          <Text style={[styles.errorText, isDark && { color: "#D1D5DB" }]}>{error}</Text>
+          <Text style={[styles.errorText, isDark && { color: "#D1D5DB" }]}>
+            {error}
+          </Text>
           <ActionButton
             variant="caregiver"
             style={styles.retryBtn}
@@ -588,7 +726,9 @@ export default function NurseDashboard() {
             size={64}
             color={Colors.textDisabled}
           />
-          <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>Belum Ada Bayi</Text>
+          <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>
+            Belum Ada Bayi
+          </Text>
           <Text style={[styles.emptyText, isDark && { color: "#9CA3AF" }]}>
             Tap tombol + untuk mendaftarkan bayi baru
           </Text>
@@ -608,7 +748,9 @@ export default function NurseDashboard() {
       ) : (
         <ScrollView
           contentContainerStyle={
-            filteredBabies.length > 0 ? styles.grid : styles.resultsEmptyContainer
+            filteredBabies.length > 0
+              ? styles.grid
+              : styles.resultsEmptyContainer
           }
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -630,14 +772,21 @@ export default function NurseDashboard() {
               />
             ))
           ) : (
-          <View style={[styles.filterEmptyBox, isDark && { backgroundColor: "#111827" }]}>
+            <View
+              style={[
+                styles.filterEmptyBox,
+                isDark && { backgroundColor: "#111827" },
+              ]}
+            >
               <Icon
                 name="search-outline"
                 library="ionicons"
                 size={36}
                 color={Colors.textDisabled}
               />
-              <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>Bayi tidak ditemukan</Text>
+              <Text style={[styles.emptyTitle, isDark && { color: "#F9FAFB" }]}>
+                Bayi tidak ditemukan
+              </Text>
               <Text style={[styles.emptyText, isDark && { color: "#9CA3AF" }]}>
                 Coba ubah kata pencarian atau pilih filter lain.
               </Text>
@@ -659,7 +808,12 @@ export default function NurseDashboard() {
         <TouchableWithoutFeedback onPress={() => setIsMenuVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.dropdownMenu, isDark && { backgroundColor: "#1F2937" }]}>
+              <View
+                style={[
+                  styles.dropdownMenu,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.dropdownItem}
                   onPress={() => {
@@ -676,8 +830,20 @@ export default function NurseDashboard() {
                     />
                   </View>
                   <View>
-                    <Text style={[styles.dropdownTitle, isDark && { color: "#F9FAFB" }]}>Daftarkan Bayi</Text>
-                    <Text style={[styles.dropdownDesc, isDark && { color: "#9CA3AF" }]}>
+                    <Text
+                      style={[
+                        styles.dropdownTitle,
+                        isDark && { color: "#F9FAFB" },
+                      ]}
+                    >
+                      Daftarkan Bayi
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dropdownDesc,
+                        isDark && { color: "#9CA3AF" },
+                      ]}
+                    >
                       Tambah profil bayi baru
                     </Text>
                   </View>
@@ -695,7 +861,11 @@ export default function NurseDashboard() {
                   <View
                     style={[
                       styles.dropdownIconBox,
-                      { backgroundColor: isDark ? "#26372F" : Colors.primaryLight },
+                      {
+                        backgroundColor: isDark
+                          ? "#26372F"
+                          : Colors.primaryLight,
+                      },
                     ]}
                   >
                     <Icon
@@ -706,10 +876,22 @@ export default function NurseDashboard() {
                     />
                   </View>
                   <View>
-                    <Text style={[styles.dropdownTitle, isDark && { color: "#F9FAFB" }]}>
+                    <Text
+                      style={[
+                        styles.dropdownTitle,
+                        isDark && { color: "#F9FAFB" },
+                      ]}
+                    >
                       Konfigurasi Perangkat
                     </Text>
-                    <Text style={[styles.dropdownDesc, isDark && { color: "#9CA3AF" }]}>Atur kamera baru</Text>
+                    <Text
+                      style={[
+                        styles.dropdownDesc,
+                        isDark && { color: "#9CA3AF" },
+                      ]}
+                    >
+                      Atur kamera baru
+                    </Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -723,12 +905,33 @@ export default function NurseDashboard() {
         animationType="fade"
         onRequestClose={() => setIsProfileMenuVisible(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setIsProfileMenuVisible(false)}>
+        <TouchableWithoutFeedback
+          onPress={() => setIsProfileMenuVisible(false)}
+        >
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.profileDropdown, isDark && { backgroundColor: "#1F2937" }]}>
-                <Text style={[styles.profileDropdownName, isDark && { color: "#F9FAFB" }]}>{user.name}</Text>
-                <Text style={[styles.profileDropdownRole, isDark && { color: "#9CA3AF" }]}>Pengasuh</Text>
+              <View
+                style={[
+                  styles.profileDropdown,
+                  isDark && { backgroundColor: "#1F2937" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileDropdownName,
+                    isDark && { color: "#F9FAFB" },
+                  ]}
+                >
+                  {user.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.profileDropdownRole,
+                    isDark && { color: "#9CA3AF" },
+                  ]}
+                >
+                  Pengasuh
+                </Text>
                 <View style={styles.dropdownDivider} />
                 <TouchableOpacity
                   style={styles.profileOption}
@@ -738,8 +941,19 @@ export default function NurseDashboard() {
                   }}
                   accessibilityRole="button"
                 >
-                  <Icon name="person-outline" size={19} color={Colors.textSecondary} />
-                  <Text style={[styles.profileOptionText, isDark && { color: "#F3F4F6" }]}>Profil</Text>
+                  <Icon
+                    name="person-outline"
+                    size={19}
+                    color={Colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.profileOptionText,
+                      isDark && { color: "#F3F4F6" },
+                    ]}
+                  >
+                    Profil
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.profileOption}
@@ -749,8 +963,19 @@ export default function NurseDashboard() {
                   }}
                   accessibilityRole="button"
                 >
-                  <Icon name="log-out-outline" size={19} color={Colors.critical} />
-                  <Text style={[styles.profileOptionText, { color: Colors.critical }]}>Keluar</Text>
+                  <Icon
+                    name="log-out-outline"
+                    size={19}
+                    color={Colors.critical}
+                  />
+                  <Text
+                    style={[
+                      styles.profileOptionText,
+                      { color: Colors.critical },
+                    ]}
+                  >
+                    Keluar
+                  </Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
@@ -780,11 +1005,19 @@ export default function NurseDashboard() {
             style={StyleSheet.absoluteFill}
             onPress={() => setIsAlertsVisible(false)}
           />
-              <View style={[styles.alertsCard, isDark && { backgroundColor: "#1F2937" }]} accessibilityViewIsModal>
+          <View
+            style={[
+              styles.alertsCard,
+              isDark && { backgroundColor: "#1F2937" },
+            ]}
+            accessibilityViewIsModal
+          >
             <View style={styles.alertsHeader}>
               <View style={styles.alertsHeading}>
                 <Text style={styles.logoutTitle}>Notifikasi</Text>
-                <Text style={styles.logoutMessage}>{activeAlerts.length} perlu ditangani</Text>
+                <Text style={styles.logoutMessage}>
+                  {activeAlerts.length} perlu ditangani
+                </Text>
               </View>
               <View style={styles.alertsHeaderActions}>
                 <MuteToggle />
@@ -800,14 +1033,33 @@ export default function NurseDashboard() {
             </View>
             {activeAlerts.length === 0 ? (
               <View style={styles.alertsEmpty}>
-                <Icon name="notifications-off-outline" size={30} color={Colors.textDisabled} />
-                <Text style={styles.alertsEmptyText}>Tidak ada notifikasi baru</Text>
+                <Icon
+                  name="notifications-off-outline"
+                  size={30}
+                  color={Colors.textDisabled}
+                />
+                <Text style={styles.alertsEmptyText}>
+                  Tidak ada notifikasi baru
+                </Text>
               </View>
             ) : (
-              <ScrollView style={styles.alertsList} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.alertsList}
+                showsVerticalScrollIndicator={false}
+              >
                 {activeAlerts.map((alert) => (
                   <View key={alert.id} style={styles.alertRow}>
-                    <View style={[styles.alertSeverityDot, { backgroundColor: alert.severity === "critical" ? Colors.critical : Colors.warning }]} />
+                    <View
+                      style={[
+                        styles.alertSeverityDot,
+                        {
+                          backgroundColor:
+                            alert.severity === "critical"
+                              ? Colors.critical
+                              : Colors.warning,
+                        },
+                      ]}
+                    />
                     <TouchableOpacity
                       style={styles.alertCopy}
                       onPress={() => {
@@ -816,16 +1068,31 @@ export default function NurseDashboard() {
                       }}
                     >
                       <Text style={styles.alertBabyName}>{alert.babyName}</Text>
-                      <Text style={styles.alertMessage} numberOfLines={2}>{alert.message}</Text>
-                      <Text style={styles.alertTimestamp}>{new Date(alert.timestamp).toLocaleString("id-ID")}</Text>
+                      <Text style={styles.alertMessage} numberOfLines={2}>
+                        {alert.message}
+                      </Text>
+                      <Text style={styles.alertTimestamp}>
+                        {new Date(alert.timestamp).toLocaleString("id-ID")}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.alertAcknowledge}
-                      onPress={() => void acknowledgeAlert(alert.id).catch(() => Alert.alert("Gagal", "Notifikasi belum dapat ditandai."))}
+                      onPress={() =>
+                        void acknowledgeAlert(alert.id).catch(() =>
+                          Alert.alert(
+                            "Gagal",
+                            "Notifikasi belum dapat ditandai.",
+                          ),
+                        )
+                      }
                       accessibilityRole="button"
                       accessibilityLabel={`Tandai notifikasi ${alert.babyName} sudah ditangani`}
                     >
-                      <Icon name="checkmark-circle-outline" size={22} color={Colors.success} />
+                      <Icon
+                        name="checkmark-circle-outline"
+                        size={22}
+                        color={Colors.success}
+                      />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -868,7 +1135,12 @@ export default function NurseDashboard() {
           >
             <View style={styles.logoutTopRow}>
               <View style={styles.logoutIcon}>
-                <Icon name="log-out-outline" library="ionicons" size={24} color={Colors.critical} />
+                <Icon
+                  name="log-out-outline"
+                  library="ionicons"
+                  size={24}
+                  color={Colors.critical}
+                />
               </View>
               <TouchableOpacity
                 style={styles.logoutCloseButton}
@@ -925,16 +1197,81 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerIconButton: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
-  headerSearchBox: { minWidth: 40, height: 42, flexDirection: "row", alignItems: "center", borderRadius: 24, overflow: "hidden" },
-  headerSearchIconButton: { width: 40, height: 42, alignItems: "center", justifyContent: "center" },
-  headerSearchInputWrap: { flex: 1, minWidth: 0, height: 42, flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 },
-  headerSearchInput: { flex: 1, minWidth: 0, paddingVertical: 0, fontFamily: Fonts.interRegular, fontSize: 13, color: Colors.textPrimary },
-  headerSearchClear: { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
-  bellDot: { position: "absolute", top: 9, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.critical, borderWidth: 1, borderColor: Colors.white },
-  profileTrigger: { minHeight: 44, marginLeft: "auto", marginRight: 8, flexDirection: "row", alignItems: "center", gap: 4 },
-  profileAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: Colors.secondaryLight },
-  profileInitial: { fontFamily: Fonts.nunitoBold, fontSize: 16, color: Colors.secondaryDark },
+  headerIconButton: {
+    width: 40,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerSearchBox: {
+    minWidth: 40,
+    height: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  headerSearchIconButton: {
+    width: 40,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerSearchInputWrap: {
+    flex: 1,
+    minWidth: 0,
+    height: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingRight: 8,
+  },
+  headerSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 0,
+    fontFamily: Fonts.interRegular,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  headerSearchClear: {
+    width: 32,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bellDot: {
+    position: "absolute",
+    top: 9,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.critical,
+    borderWidth: 1,
+    borderColor: Colors.white,
+  },
+  profileTrigger: {
+    minHeight: 44,
+    marginLeft: "auto",
+    marginRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  profileAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.secondaryLight,
+  },
+  profileInitial: {
+    fontFamily: Fonts.nunitoBold,
+    fontSize: 16,
+    color: Colors.secondaryDark,
+  },
   headerTitle: {
     ...Typography.h1,
     color: Colors.secondaryDark,
@@ -960,9 +1297,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.white,
   },
-  addBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  logoutBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  clearSearchBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  addBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearSearchBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   summaryBar: {
     flexDirection: "row",
     backgroundColor: Colors.white,
@@ -1216,8 +1568,19 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
-  logoutTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  logoutCloseButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginTop: -8, marginRight: -8 },
+  logoutTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  logoutCloseButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -8,
+    marginRight: -8,
+  },
   logoutIcon: {
     width: 56,
     height: 56,
@@ -1287,36 +1650,147 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
-  profileDropdown: { position: "absolute", top: 72, right: 16, width: 230, backgroundColor: Colors.white, borderRadius: 16, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.16, shadowRadius: 14, elevation: 8 },
+  profileDropdown: {
+    position: "absolute",
+    top: 72,
+    right: 16,
+    width: 230,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 8,
+  },
   profileDropdownName: { ...Typography.bodyStrong, color: Colors.textPrimary },
-  profileDropdownRole: { ...Typography.caption, color: Colors.textMuted, marginTop: 2 },
-  profileOption: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 6 },
+  profileDropdownRole: {
+    ...Typography.caption,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  profileOption: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 6,
+  },
   profileOptionText: { ...Typography.body, color: Colors.textPrimary },
-  centeredModalOverlay: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "rgba(15,23,42,0.38)" },
-  profileCard: { width: "100%", maxWidth: 360, alignItems: "center", padding: 24, borderRadius: 20, backgroundColor: Colors.white, gap: 8 },
-  profileAvatarLarge: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: Colors.secondaryLight, marginBottom: 4 },
-  profileInitialLarge: { fontFamily: Fonts.nunitoBold, fontSize: 28, color: Colors.secondaryDark },
+  centeredModalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(15,23,42,0.38)",
+  },
+  profileCard: {
+    width: "100%",
+    maxWidth: 360,
+    alignItems: "center",
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    gap: 8,
+  },
+  profileAvatarLarge: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.secondaryLight,
+    marginBottom: 4,
+  },
+  profileInitialLarge: {
+    fontFamily: Fonts.nunitoBold,
+    fontSize: 28,
+    color: Colors.secondaryDark,
+  },
   profileCardName: { ...Typography.h2, color: Colors.textPrimary },
   profileCardRole: { ...Typography.body, color: Colors.textMuted },
-  profileInfoRow: { width: "100%", flexDirection: "row", justifyContent: "space-between", paddingVertical: 14, marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  profileInfoRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
   profileInfoLabel: { ...Typography.body, color: Colors.textMuted },
   profileInfoValue: { ...Typography.bodyStrong, color: Colors.textPrimary },
-  profileDoneButton: { width: "100%", minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: Radii.control, backgroundColor: Colors.secondary, marginTop: 4 },
+  profileDoneButton: {
+    width: "100%",
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: Radii.control,
+    backgroundColor: Colors.secondary,
+    marginTop: 4,
+  },
   profileDoneText: { ...Typography.bodyStrong, color: Colors.white },
-  alertsCard: { width: "100%", maxWidth: 380, maxHeight: "80%", padding: 24, borderRadius: 18, backgroundColor: Colors.white, gap: 12, shadowColor: "#000000", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 12 },
-  alertsHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  alertsCard: {
+    width: "100%",
+    maxWidth: 380,
+    maxHeight: "80%",
+    padding: 24,
+    borderRadius: 18,
+    backgroundColor: Colors.white,
+    gap: 12,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  alertsHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
   alertsHeading: { flex: 1, gap: 4, paddingTop: 4 },
   alertsHeaderActions: { flexDirection: "row", alignItems: "center" },
-  alertsCloseButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  alertsCloseButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   alertsList: { flexGrow: 0 },
-  alertRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  alertRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
   alertSeverityDot: { width: 9, height: 9, borderRadius: 5, marginTop: 5 },
   alertCopy: { flex: 1, gap: 3 },
   alertBabyName: { ...Typography.bodyStrong, color: Colors.textPrimary },
-  alertMessage: { ...Typography.body, color: Colors.textSecondary, lineHeight: 19 },
+  alertMessage: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
   alertTimestamp: { ...Typography.caption, color: Colors.textMuted },
-  alertAcknowledge: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  alertsEmpty: { minHeight: 150, alignItems: "center", justifyContent: "center", gap: 10 },
+  alertAcknowledge: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertsEmpty: {
+    minHeight: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
   alertsEmptyText: { ...Typography.body, color: Colors.textMuted },
   dropdownItem: {
     flexDirection: "row",
@@ -1335,7 +1809,7 @@ const styles = StyleSheet.create({
   },
   dropdownTitle: {
     fontFamily: Fonts.nunitoBold,
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.textPrimary,
   },
   dropdownDesc: {

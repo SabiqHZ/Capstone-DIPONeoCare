@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
@@ -16,21 +16,31 @@ import {
 import Svg, { Path } from "react-native-svg";
 
 import { useAuthStore } from "../../stores/auth.store";
-import { useBabyContext } from "../../context/BabyContext";
+import { useBabyContext, useBabyStatusById } from "../../context/BabyContext";
 import { api } from "../../services/api";
 import { deviceService } from "../../services/device.service";
 import { reportService } from "../../services/report.service";
 import { DailyReport } from "../../types";
 import { Colors } from "../../constants/colors";
-import { Typography } from "../../constants/fonts";
+import { formatDurationMinutes } from "../../utils/duration";
+import { Fonts, Typography } from "../../constants/fonts";
 import { Radii, Spacing } from "../../constants/ui";
 import React from "react";
 
 const { width } = Dimensions.get("window");
 
+const Text = ({ style, ...props }: React.ComponentProps<typeof NativeText>) => (
+  <NativeText
+    {...props}
+    style={[{ fontFamily: Fonts.poppinsRegular }, style]}
+  />
+);
+
 export default function CameraScreen() {
   const user = useAuthStore((s) => s.user);
-  const { state, setFocused } = useBabyContext();
+  const babyId = user?.role === "parent" ? user.babyId : null;
+  const { setFocused } = useBabyContext();
+  const focusedStatus = useBabyStatusById(babyId ?? "");
 
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
 
@@ -66,16 +76,15 @@ export default function CameraScreen() {
   const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
   const lastReportFetchedAtRef = useRef(0);
 
-  const babyId = user?.role === "parent" ? user.babyId : null;
-
-  const focusedStatus = babyId ? state.statuses[babyId] : null;
-
   const isDeviceOnline =
     focusedStatus?.deviceOnline ?? apiDeviceOnline ?? false;
 
   const getActivityDistribution = () => {
     if (!dailyReport) {
       return {
+        sleepMinutes: 0,
+        awakeMinutes: 0,
+        cryingMinutes: 0,
         sleepPct: 0,
         awakePct: 0,
         cryingPct: 0,
@@ -92,26 +101,17 @@ export default function CameraScreen() {
       crying += hour.cryingMinutes;
     }
 
-    const total = sleep + awake + crying;
-
-    if (total <= 0) {
-      return {
-        sleepPct: 0,
-        awakePct: 0,
-        cryingPct: 0,
-      };
-    }
-
-    const sleepPct = Math.round((sleep / total) * 100);
-
-    const awakePct = Math.round((awake / total) * 100);
-
-    const cryingPct = Math.max(0, 100 - sleepPct - awakePct);
+    const minutesInDay = 24 * 60;
+    const percentageOfDay = (minutes: number) =>
+      Math.min(100, Math.round((minutes / minutesInDay) * 100));
 
     return {
-      sleepPct,
-      awakePct,
-      cryingPct,
+      sleepMinutes: sleep,
+      awakeMinutes: awake,
+      cryingMinutes: crying,
+      sleepPct: percentageOfDay(sleep),
+      awakePct: percentageOfDay(awake),
+      cryingPct: percentageOfDay(crying),
     };
   };
 
@@ -172,71 +172,74 @@ export default function CameraScreen() {
   /**
    * Ambil device + stream URL dari backend.
    */
-  const fetchStreamUrl = useCallback(async (preserveCurrent = false) => {
-    if (!babyId) {
-      setStreamUrl(null);
-      resetCameraFrames();
-      setApiDeviceOnline(null);
-      setHasError(false);
-      setIsLoadingDevice(false);
-      return;
-    }
-
-    if (!preserveCurrent) {
-      setIsLoadingDevice(true);
-      setHasError(false);
-    }
-
-    try {
-      console.log("[ParentCamera] Mulai mengambil device...");
-
-      const response = await api.get(`/babies/${babyId}`);
-
-      console.log("[ParentCamera] baby response:", response.data);
-
-      const device = response.data.data?.devices;
-
-      console.log("[ParentCamera] device:", device);
-
-      const deviceId = device?.id;
-
-      console.log("[ParentCamera] deviceId:", deviceId);
-
-      if (!deviceId) {
-        console.error("[ParentCamera] Device ID tidak ditemukan.");
-
-        setStreamUrl(null);
-        resetCameraFrames();
-        setApiDeviceOnline(false);
-        setHasError(true);
-
-        return;
-      }
-
-      const url = await deviceService.getStreamUrl(deviceId);
-
-      console.log("[ParentCamera] streamUrl:", url);
-
-      setApiDeviceOnline(
-        typeof device?.is_online === "boolean" ? device.is_online : null,
-      );
-
-      setStreamUrl(url);
-    } catch (error) {
-      console.error("[ParentCamera] fetchStreamUrl ERROR:", error);
-
-      if (!preserveCurrent) {
+  const fetchStreamUrl = useCallback(
+    async (preserveCurrent = false) => {
+      if (!babyId) {
         setStreamUrl(null);
         resetCameraFrames();
         setApiDeviceOnline(null);
-        setHasError(true);
-      }
-    } finally {
-      if (!preserveCurrent) {
+        setHasError(false);
         setIsLoadingDevice(false);
+        return;
       }
-    }
-  }, [babyId]);
+
+      if (!preserveCurrent) {
+        setIsLoadingDevice(true);
+        setHasError(false);
+      }
+
+      try {
+        console.log("[ParentCamera] Mulai mengambil device...");
+
+        const response = await api.get(`/babies/${babyId}`);
+
+        console.log("[ParentCamera] baby response:", response.data);
+
+        const device = response.data.data?.devices;
+
+        console.log("[ParentCamera] device:", device);
+
+        const deviceId = device?.id;
+
+        console.log("[ParentCamera] deviceId:", deviceId);
+
+        if (!deviceId) {
+          console.error("[ParentCamera] Device ID tidak ditemukan.");
+
+          setStreamUrl(null);
+          resetCameraFrames();
+          setApiDeviceOnline(false);
+          setHasError(true);
+
+          return;
+        }
+
+        const url = await deviceService.getStreamUrl(deviceId);
+
+        console.log("[ParentCamera] streamUrl:", url);
+
+        setApiDeviceOnline(
+          typeof device?.is_online === "boolean" ? device.is_online : null,
+        );
+
+        setStreamUrl(url);
+      } catch (error) {
+        console.error("[ParentCamera] fetchStreamUrl ERROR:", error);
+
+        if (!preserveCurrent) {
+          setStreamUrl(null);
+          resetCameraFrames();
+          setApiDeviceOnline(null);
+          setHasError(true);
+        }
+      } finally {
+        if (!preserveCurrent) {
+          setIsLoadingDevice(false);
+        }
+      }
+    },
+    [babyId],
+  );
 
   /**
    * Ambil report harian.
@@ -391,8 +394,12 @@ export default function CameraScreen() {
   const videoHeight = isFullscreen ? width * 1.1 : width * 0.75;
 
   const currentActivityLabel = () => {
+    if (!isDeviceOnline) {
+      return "-";
+    }
+
     if (!focusedStatus) {
-      return "—";
+      return "Tidak ada bayi yang terdeteksi";
     }
 
     if (focusedStatus.activity === "sleeping") {
@@ -407,12 +414,13 @@ export default function CameraScreen() {
       return "Menangis";
     }
 
-    return "—";
+    return "Tidak ada bayi yang terdeteksi";
   };
 
   const anomalyType = focusedStatus?.faceAnomaly ?? null;
 
   const hasAnomaly = anomalyType !== null && anomalyType !== "none";
+  const noBabyDetected = currentActivityLabel() === "Tidak ada bayi yang terdeteksi";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -430,277 +438,301 @@ export default function CameraScreen() {
           />
         }
       >
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Kamera Langsung</Text>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Kamera Langsung</Text>
 
-        <View style={styles.badges}>
-          <View
-            style={[
-              styles.onlineBadge,
-              {
-                backgroundColor: isDeviceOnline ? Colors.successLight : Colors.offlineLight,
-              },
-            ]}
-          >
+          <View style={styles.badges}>
             <View
               style={[
-                styles.onlineDot,
+                styles.onlineBadge,
                 {
-                  backgroundColor: isDeviceOnline ? Colors.success : Colors.offline,
-                },
-              ]}
-            />
-
-            <Text
-              style={[
-                styles.onlineText,
-                {
-                  color: isDeviceOnline ? Colors.successDark : Colors.offlineDark,
+                  backgroundColor: isDeviceOnline
+                    ? Colors.successLight
+                    : Colors.offlineLight,
                 },
               ]}
             >
-              {isDeviceOnline ? "Aktif" : "Tidak aktif"}
-            </Text>
+              <View
+                style={[
+                  styles.onlineDot,
+                  {
+                    backgroundColor: isDeviceOnline
+                      ? Colors.success
+                      : Colors.offline,
+                  },
+                ]}
+              />
+
+              <Text
+                style={[
+                  styles.onlineText,
+                  {
+                    color: isDeviceOnline
+                      ? Colors.successDark
+                      : Colors.offlineDark,
+                  },
+                ]}
+              >
+                {isDeviceOnline ? "Aktif" : "Tidak aktif"}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* CAMERA */}
-      <View
-        style={[
-          styles.videoWrapper,
-          {
-            height: videoHeight,
-          },
-        ]}
-      >
-        {streamUrl ? (
-          <>
-            {/* BUFFER 0 */}
-            {frameUrls[0] ? (
-              <Image
-                key={`camera-0-${frameUrls[0]}`}
-                source={{ uri: frameUrls[0] }}
-                style={[
-                  styles.cameraImage,
-                  {
-                    opacity: hasFrame && activeFrameIndex === 0 ? 1 : 0,
-                  },
-                ]}
-                resizeMode="contain"
-                fadeDuration={0}
-                onLoad={() => handleFrameLoaded(0, frameUrls[0])}
-                onError={() => handleFrameError(0, frameUrls[0])}
-              />
-            ) : null}
-
-            {/* BUFFER 1 */}
-            {frameUrls[1] ? (
-              <Image
-                key={`camera-1-${frameUrls[1]}`}
-                source={{ uri: frameUrls[1] }}
-                style={[
-                  styles.cameraImage,
-                  {
-                    opacity: hasFrame && activeFrameIndex === 1 ? 1 : 0,
-                  },
-                ]}
-                resizeMode="contain"
-                fadeDuration={0}
-                onLoad={() => handleFrameLoaded(1, frameUrls[1])}
-                onError={() => handleFrameError(1, frameUrls[1])}
-              />
-            ) : null}
-
-            {/* Tampilkan indikator hanya sebelum frame pertama berhasil */}
-            {!hasFrame ? (
-              <View style={styles.centerBox}>
-                {hasError ? (
-                  <>
-                    <Text style={styles.offlineText}>
-                      Belum menerima gambar kamera
-                    </Text>
-
-                    <Text style={styles.offlineSub}>
-                      Mencoba kembali secara otomatis...
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <ActivityIndicator color="#1D9E75" />
-
-                    <Text style={styles.centerText}>
-                      Memuat gambar kamera...
-                    </Text>
-                  </>
-                )}
-              </View>
-            ) : null}
-          </>
-        ) : isLoadingDevice ? (
-          <View style={styles.centerBox}>
-            <ActivityIndicator size="large" />
-
-            <Text style={styles.centerText}>Menghubungkan ke kamera...</Text>
-          </View>
-        ) : hasError ? (
-          <View style={styles.centerBox}>
-            <Text style={styles.offlineText}>Gagal memuat kamera</Text>
-
-            <TouchableOpacity
-              style={styles.retryBtn}
-              onPress={() => void fetchStreamUrl()}
-            >
-              <Text style={styles.retryText}>Coba Lagi</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.centerBox}>
-            <Text style={styles.offlineText}>Kamera belum dikonfigurasi</Text>
-
-            <Text style={styles.offlineSub}>
-              Hubungi tenaga medis untuk memindai kode QR kamera.
-            </Text>
-          </View>
-        )}
-
-        {/* FULLSCREEN */}
-        <TouchableOpacity
-          style={styles.fullscreenBtn}
-          onPress={() => setIsFullscreen((current) => !current)}
-          accessibilityRole="button"
-          accessibilityLabel={isFullscreen ? "Keluar dari layar penuh" : "Buka kamera layar penuh"}
-          accessibilityHint={isFullscreen ? "Kembali ke tampilan kamera dan informasi" : "Membuka tampilan kamera memenuhi layar"}
+        {/* CAMERA */}
+        <View
+          style={[
+            styles.videoWrapper,
+            {
+              height: videoHeight,
+            },
+          ]}
         >
-          <Text style={styles.fullscreenIcon}>{isFullscreen ? "⊠" : "⊡"}</Text>
-        </TouchableOpacity>
-      </View>
+          {streamUrl ? (
+            <>
+              {/* BUFFER 0 */}
+              {frameUrls[0] ? (
+                <Image
+                  key={`camera-0-${frameUrls[0]}`}
+                  source={{ uri: frameUrls[0] }}
+                  style={[
+                    styles.cameraImage,
+                    {
+                      opacity: hasFrame && activeFrameIndex === 0 ? 1 : 0,
+                    },
+                  ]}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                  onLoad={() => handleFrameLoaded(0, frameUrls[0])}
+                  onError={() => handleFrameError(0, frameUrls[0])}
+                />
+              ) : null}
 
-      {/* INFO */}
-      <View style={styles.infoPanel}>
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Aktivitas bayi</Text>
+              {/* BUFFER 1 */}
+              {frameUrls[1] ? (
+                <Image
+                  key={`camera-1-${frameUrls[1]}`}
+                  source={{ uri: frameUrls[1] }}
+                  style={[
+                    styles.cameraImage,
+                    {
+                      opacity: hasFrame && activeFrameIndex === 1 ? 1 : 0,
+                    },
+                  ]}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                  onLoad={() => handleFrameLoaded(1, frameUrls[1])}
+                  onError={() => handleFrameError(1, frameUrls[1])}
+                />
+              ) : null}
 
-            <Text style={styles.infoValue}>{currentActivityLabel()}</Text>
-          </View>
+              {/* Tampilkan indikator hanya sebelum frame pertama berhasil */}
+              {!hasFrame ? (
+                <View style={styles.centerBox}>
+                  {hasError ? (
+                    <>
+                      <Text style={styles.offlineText}>
+                        Belum menerima gambar kamera
+                      </Text>
 
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Wajah bayi</Text>
+                      <Text style={styles.offlineSub}>
+                        Mencoba kembali secara otomatis...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <ActivityIndicator color="#1D9E75" />
 
-            <Text
-              style={[
-                styles.infoValue,
-                {
-                  color: !isDeviceOnline
-                    ? "#fff"
-                    : hasAnomaly
-                      ? Colors.warning
-                      : Colors.success,
-                },
-              ]}
-            >
-              {!isDeviceOnline || !focusedStatus
-                ? "—"
-                : anomalyType === null
-                  ? "Menunggu hasil pemantauan"
-                  : hasAnomaly
-                    ? anomalyType
-                    : "Terdeteksi"}
+                      <Text style={styles.centerText}>
+                        Memuat gambar kamera...
+                      </Text>
+                    </>
+                  )}
+                </View>
+              ) : null}
+            </>
+          ) : isLoadingDevice ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator size="large" />
+
+              <Text style={styles.centerText}>Menghubungkan ke kamera...</Text>
+            </View>
+          ) : hasError ? (
+            <View style={styles.centerBox}>
+              <Text style={styles.offlineText}>Gagal memuat kamera</Text>
+
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => void fetchStreamUrl()}
+              >
+                <Text style={styles.retryText}>Coba Lagi</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.centerBox}>
+              <Text style={styles.offlineText}>Kamera belum dikonfigurasi</Text>
+
+              <Text style={styles.offlineSub}>
+                Hubungi tenaga medis untuk memindai kode QR kamera.
+              </Text>
+            </View>
+          )}
+
+          {/* FULLSCREEN */}
+          <TouchableOpacity
+            style={styles.fullscreenBtn}
+            onPress={() => setIsFullscreen((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFullscreen
+                ? "Keluar dari layar penuh"
+                : "Buka kamera layar penuh"
+            }
+            accessibilityHint={
+              isFullscreen
+                ? "Kembali ke tampilan kamera dan informasi"
+                : "Membuka tampilan kamera memenuhi layar"
+            }
+          >
+            <Text style={styles.fullscreenIcon}>
+              {isFullscreen ? "⊠" : "⊡"}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
-        {/* ACTIVITY DISTRIBUTION */}
-        <View style={styles.chartCard}>
-          {/* TIDUR */}
-          <View style={styles.progressGroup}>
-            <Text
-              style={[
-                styles.progressLabel,
-                {
-                  color: Colors.success,
-                },
-              ]}
-            >
-              {activityDistribution.sleepPct}%{" "}
-              <Text style={styles.labelSub}>Tidur</Text>
-            </Text>
+        {/* INFO */}
+        <View style={styles.infoPanel}>
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Aktivitas bayi</Text>
 
-            <View style={styles.progressTrack}>
-              <View
+              <Text style={styles.infoValue}>{currentActivityLabel()}</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Wajah bayi</Text>
+
+              <Text
                 style={[
-                  styles.progressBar,
+                  styles.infoValue,
                   {
-                    width: `${activityDistribution.sleepPct}%`,
-                    backgroundColor: Colors.success,
+                    color: !isDeviceOnline
+                      ? "#fff"
+                    : noBabyDetected
+                      ? Colors.neutral
+                      : hasAnomaly
+                        ? Colors.critical
+                        : Colors.success,
                   },
                 ]}
-              />
+              >
+                {focusedStatus?.isDetectionStale
+                  ? noBabyDetected
+                    ? "Tidak ada bayi yang terdeteksi"
+                    : "-"
+                  : !isDeviceOnline || !focusedStatus
+                    ? noBabyDetected
+                      ? "Tidak ada bayi yang terdeteksi"
+                      : "—"
+                    : anomalyType === null
+                      ? noBabyDetected
+                        ? "Tidak ada bayi yang terdeteksi"
+                        : "Menunggu hasil pemantauan"
+                      : hasAnomaly
+                        ? "Tertutupi!"
+                        : "Terdeteksi"}
+              </Text>
             </View>
           </View>
 
-          {/* BANGUN */}
-          <View style={styles.progressGroup}>
-            <Text
-              style={[
-                styles.progressLabel,
-                {
-                  color: Colors.info,
-                },
-              ]}
-            >
-              {activityDistribution.awakePct}%{" "}
-              <Text style={styles.labelSub}>Bangun</Text>
-            </Text>
+          {/* ACTIVITY DISTRIBUTION */}
+          <View style={styles.chartCard}>
+            <View style={styles.chartIntro}>
+              <Text style={styles.chartTitle}>Distribusi aktivitas 24 jam</Text>
+              <Text style={styles.chartDescription}>
+                Durasi yang berhasil terklasifikasi
+              </Text>
+            </View>
 
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${activityDistribution.awakePct}%`,
-                    backgroundColor: Colors.info,
-                  },
-                ]}
-              />
+            {/* TIDUR */}
+            <View style={styles.progressGroup}>
+              <View style={styles.progressHeader}>
+                <Text style={[styles.progressLabel, { color: Colors.success }]}>
+                  Tidur
+                </Text>
+                <Text style={styles.progressValue}>
+                  {formatDurationMinutes(activityDistribution.sleepMinutes)} ·{" "}
+                  {activityDistribution.sleepPct}%
+                </Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: `${activityDistribution.sleepPct}%`,
+                      backgroundColor: Colors.success,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* BANGUN */}
+            <View style={styles.progressGroup}>
+              <View style={styles.progressHeader}>
+                <Text style={[styles.progressLabel, { color: Colors.info }]}>
+                  Bangun
+                </Text>
+                <Text style={styles.progressValue}>
+                  {formatDurationMinutes(activityDistribution.awakeMinutes)} ·{" "}
+                  {activityDistribution.awakePct}%
+                </Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: `${activityDistribution.awakePct}%`,
+                      backgroundColor: Colors.info,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* MENANGIS */}
+            <View style={styles.progressGroup}>
+              <View style={styles.progressHeader}>
+                <Text
+                  style={[styles.progressLabel, { color: Colors.critical }]}
+                >
+                  Menangis
+                </Text>
+                <Text style={styles.progressValue}>
+                  {formatDurationMinutes(activityDistribution.cryingMinutes)} ·{" "}
+                  {activityDistribution.cryingPct}%
+                </Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: `${activityDistribution.cryingPct}%`,
+                      backgroundColor: Colors.critical,
+                    },
+                  ]}
+                />
+              </View>
             </View>
           </View>
-
-          {/* MENANGIS */}
-          <View style={styles.progressGroup}>
-            <Text
-              style={[
-                styles.progressLabel,
-                {
-                  color: Colors.critical,
-                },
-              ]}
-            >
-              {activityDistribution.cryingPct}%{" "}
-              <Text style={styles.labelSub}>Menangis</Text>
-            </Text>
-
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${activityDistribution.cryingPct}%`,
-                    backgroundColor: Colors.critical,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          <Text style={styles.streamNote}>
-            Tampilan langsung menggunakan gambar terbaru · Penanda deteksi tidak
-            ditampilkan
-          </Text>
         </View>
-      </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -887,19 +919,40 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  chartIntro: {
+    gap: 3,
+  },
+
+  chartTitle: {
+    ...Typography.bodyStrong,
+    color: "#F3F4F6",
+  },
+
+  chartDescription: {
+    ...Typography.caption,
+    color: "#9CA3AF",
+  },
+
   progressGroup: {
     gap: 6,
   },
 
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
   },
 
-  labelSub: {
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  progressValue: {
+    ...Typography.caption,
     color: "#9CA3AF",
-    fontWeight: "500",
-    fontSize: 12,
+    textAlign: "right",
   },
 
   progressTrack: {

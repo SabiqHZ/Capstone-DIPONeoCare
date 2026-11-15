@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.smartvision.mobile",
+      "bundleIdentifier": "com.diponeocare.mobile",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -21,7 +21,6 @@
       }
     },
     "android": {
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1D9E75"
@@ -32,7 +31,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.diponeocare.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -55,6 +55,14 @@
         }
       ],
       "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "react-native-wifi-reborn",
       [
         "expo-splash-screen",

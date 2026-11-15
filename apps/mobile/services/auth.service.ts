@@ -21,6 +21,11 @@ function getAuthErrorMessage(error: unknown, fallback: string): string {
 }
 
 export const authService = {
+  getCaregiverRecoveryContact: async () => {
+    const res = await api.get("/auth/nurse/recovery-contact");
+    return res.data.data as { whatsapp: string | null; email: string | null };
+  },
+
   getCaregiverProfile: async () => {
     const res = await api.get('/auth/nurse/profile');
     return res.data.data as { id: string; username: string; name: string; unitId: string };

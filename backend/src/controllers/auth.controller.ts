@@ -2,8 +2,26 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../types';
 import { authService } from '../services/auth.service';
 import { ApiResponse } from '../types';
+import { env } from '../config/env';
 
 export const authController = {
+  async getNurseRecoveryContact(_req: Request, res: Response): Promise<void> {
+    const contact = {
+      whatsapp: env.PASSWORD_RECOVERY_ADMIN_WHATSAPP || null,
+      email: env.PASSWORD_RECOVERY_ADMIN_EMAIL || null,
+    };
+
+    if (!contact.whatsapp && !contact.email) {
+      res.status(503).json({
+        success: false,
+        error: "Kontak admin belum dikonfigurasi",
+      });
+      return;
+    }
+
+    res.json({ success: true, data: contact });
+  },
+
   async getNurseProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
       const data = await authService.getNurseProfile(req.user!.sub);

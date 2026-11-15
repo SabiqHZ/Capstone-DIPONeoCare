@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   Platform,
+  TextInputInstance,
   RefreshControl,
 } from "react-native";
 import DateTimePicker, {
@@ -106,7 +107,9 @@ export default function RegisterBabyScreen() {
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
   const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
-  const [focusedField, setFocusedField] = useState<"date" | "camera" | null>(null);
+  const [focusedField, setFocusedField] = useState<"date" | "camera" | null>(
+    null,
+  );
 
   // State untuk Dropdown Kamera
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
@@ -153,7 +156,10 @@ export default function RegisterBabyScreen() {
       if (part === 0) {
         return {
           ...current,
-          bedNumber: `${value.replace(/[^a-z]/gi, "").slice(0, 1).toUpperCase()}-${digits}`,
+          bedNumber: `${value
+            .replace(/[^a-z]/gi, "")
+            .slice(0, 1)
+            .toUpperCase()}-${digits}`,
         };
       }
 
@@ -244,7 +250,9 @@ export default function RegisterBabyScreen() {
   // ── Tampilan sukses ───────────────────────────────────────────────
   if (registeredBaby) {
     return (
-      <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
+      <SafeAreaView
+        style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+      >
         <ScrollView contentContainerStyle={styles.successContainer}>
           <View style={styles.successIconWrapper}>
             <Icon
@@ -255,12 +263,16 @@ export default function RegisterBabyScreen() {
             />
           </View>
 
-          <Text style={[styles.successTitle, isDark && { color: "#A7F3D0" }]}>Bayi & Kamera Tersambung!</Text>
+          <Text style={[styles.successTitle, isDark && { color: "#A7F3D0" }]}>
+            Bayi & Kamera Tersambung!
+          </Text>
           <Text style={[styles.successSub, isDark && { color: "#9CA3AF" }]}>
             Sistem pemantauan aktif. Berikan kode berikut kepada orang tua.
           </Text>
 
-          <View style={[styles.codeBox, isDark && { backgroundColor: "#26372F" }]}>
+          <View
+            style={[styles.codeBox, isDark && { backgroundColor: "#26372F" }]}
+          >
             <Text style={styles.codeLabel}>KODE AKSES ORANG TUA</Text>
             <Text style={styles.codeValue}>{registeredBaby.uniqueCode}</Text>
             <Text style={styles.codeNote}>
@@ -268,7 +280,12 @@ export default function RegisterBabyScreen() {
             </Text>
           </View>
 
-          <View style={[styles.babyInfoBox, isDark && { backgroundColor: "#1F2937", borderColor: "#374151" }]}>
+          <View
+            style={[
+              styles.babyInfoBox,
+              isDark && { backgroundColor: "#1F2937", borderColor: "#374151" },
+            ]}
+          >
             <View style={styles.babyInfoRow}>
               <Icon
                 name="baby-face-outline"
@@ -276,7 +293,11 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>{registeredBaby.name}</Text>
+              <Text
+                style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}
+              >
+                {registeredBaby.name}
+              </Text>
             </View>
             <View style={styles.babyInfoRow}>
               <Icon
@@ -285,7 +306,9 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>
+              <Text
+                style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}
+              >
                 Tempat Tidur {registeredBaby.bedNumber}
               </Text>
             </View>
@@ -296,7 +319,9 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.textMuted}
               />
-              <Text style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}>
+              <Text
+                style={[styles.babyInfoText, isDark && { color: "#F3F4F6" }]}
+              >
                 {availableDevices.find((d) => d.id === form.deviceId)?.name ||
                   "Kamera Terhubung"}
               </Text>
@@ -346,8 +371,18 @@ export default function RegisterBabyScreen() {
 
   // ── Form ──────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={[styles.safe, isDark && { backgroundColor: "#111827" }]}>
-      <View style={[styles.header, isDark && { backgroundColor: "#1F2937", borderBottomColor: "#374151" }]}>
+    <SafeAreaView
+      style={[styles.safe, isDark && { backgroundColor: "#111827" }]}
+    >
+      <View
+        style={[
+          styles.header,
+          isDark && {
+            backgroundColor: "#1F2937",
+            borderBottomColor: "#374151",
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerBack}
@@ -359,7 +394,9 @@ export default function RegisterBabyScreen() {
             color={isDark ? "#BFDBFE" : Colors.secondaryDark}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>Daftarkan Bayi Baru</Text>
+        <Text style={[styles.headerTitle, isDark && { color: "#BFDBFE" }]}>
+          Daftarkan Bayi Baru
+        </Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -376,7 +413,9 @@ export default function RegisterBabyScreen() {
           />
         }
       >
-        <View style={[styles.infoBox, isDark && { backgroundColor: "#1E3448" }]}>
+        <View
+          style={[styles.infoBox, isDark && { backgroundColor: "#1E3448" }]}
+        >
           <Icon
             name="information-circle-outline"
             library="ionicons"
@@ -389,7 +428,9 @@ export default function RegisterBabyScreen() {
           </Text>
         </View>
 
-        <View style={[styles.formCard, isDark && { backgroundColor: "#1F2937" }]}>
+        <View
+          style={[styles.formCard, isDark && { backgroundColor: "#1F2937" }]}
+        >
           <Field
             label="Nama Bayi"
             placeholder="contoh: Bayi Budi Santoso"
@@ -407,9 +448,36 @@ export default function RegisterBabyScreen() {
           />
           <View style={styles.divider} />
           <View style={fieldStyles.wrapper}>
-            <Text style={[fieldStyles.label, { color: focusedField === "date" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.white }]}>Tanggal Lahir</Text>
+            <Text
+              style={[
+                fieldStyles.label,
+                {
+                  color:
+                    focusedField === "date"
+                      ? Colors.secondary
+                      : isDark
+                        ? "#4B5563"
+                        : Colors.border,
+                  backgroundColor: isDark ? "#111827" : Colors.white,
+                },
+              ]}
+            >
+              Tanggal Lahir
+            </Text>
             <TouchableOpacity
-              style={[fieldStyles.inputRow, { borderColor: focusedField === "date" ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: focusedField === "date" ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}
+              style={[
+                fieldStyles.inputRow,
+                {
+                  borderColor:
+                    focusedField === "date"
+                      ? Colors.secondary
+                      : isDark
+                        ? "#4B5563"
+                        : Colors.border,
+                  borderWidth: focusedField === "date" ? 2 : 1,
+                },
+                isDark && { backgroundColor: "#111827" },
+              ]}
               onPress={openDatePicker}
               accessibilityRole="button"
               accessibilityLabel="Pilih tanggal lahir dari kalender"
@@ -446,13 +514,41 @@ export default function RegisterBabyScreen() {
 
           {/* Custom Dropdown untuk Pilih Kamera */}
           <View style={fieldStyles.wrapper}>
-            <Text style={[fieldStyles.label, { color: isDeviceDropdownOpen ? Colors.secondary : isDark ? "#4B5563" : Colors.border, backgroundColor: isDark ? "#111827" : Colors.white }]}>Pilih Kamera Pemantau</Text>
+            <Text
+              style={[
+                fieldStyles.label,
+                {
+                  color: isDeviceDropdownOpen
+                    ? Colors.secondary
+                    : isDark
+                      ? "#4B5563"
+                      : Colors.border,
+                  backgroundColor: isDark ? "#111827" : Colors.white,
+                },
+              ]}
+            >
+              Pilih Kamera Pemantau
+            </Text>
             <TouchableOpacity
-              style={[fieldStyles.dropdownButton, { borderColor: isDeviceDropdownOpen ? Colors.secondary : isDark ? "#4B5563" : Colors.border, borderWidth: isDeviceDropdownOpen ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}
+              style={[
+                fieldStyles.dropdownButton,
+                {
+                  borderColor: isDeviceDropdownOpen
+                    ? Colors.secondary
+                    : isDark
+                      ? "#4B5563"
+                      : Colors.border,
+                  borderWidth: isDeviceDropdownOpen ? 2 : 1,
+                },
+                isDark && { backgroundColor: "#111827" },
+              ]}
               onPress={() => setIsDeviceDropdownOpen((open) => !open)}
               disabled={isLoadingDevices}
               accessibilityRole="button"
-              accessibilityState={{ expanded: isDeviceDropdownOpen, disabled: isLoadingDevices }}
+              accessibilityState={{
+                expanded: isDeviceDropdownOpen,
+                disabled: isLoadingDevices,
+              }}
             >
               <Icon
                 name="videocam-outline"
@@ -463,8 +559,14 @@ export default function RegisterBabyScreen() {
               <Text
                 style={
                   form.deviceId
-                    ? [fieldStyles.dropdownSelectedText, isDark && { color: "#F9FAFB" }]
-                    : [fieldStyles.dropdownPlaceholder, isDark && { color: "#9CA3AF" }]
+                    ? [
+                        fieldStyles.dropdownSelectedText,
+                        isDark && { color: "#F9FAFB" },
+                      ]
+                    : [
+                        fieldStyles.dropdownPlaceholder,
+                        isDark && { color: "#9CA3AF" },
+                      ]
                 }
               >
                 {isLoadingDevices
@@ -484,19 +586,34 @@ export default function RegisterBabyScreen() {
             </TouchableOpacity>
             {isDeviceDropdownOpen ? (
               <ScrollView
-                style={[fieldStyles.dropdownMenu, isDark && { backgroundColor: "#111827", borderColor: "#4B5563" }]}
+                style={[
+                  fieldStyles.dropdownMenu,
+                  isDark && {
+                    backgroundColor: "#111827",
+                    borderColor: "#4B5563",
+                  },
+                ]}
                 nestedScrollEnabled
                 showsVerticalScrollIndicator
               >
                 {availableDevices.length === 0 ? (
-                  <Text style={[fieldStyles.dropdownEmpty, isDark && { color: "#9CA3AF" }]}>
-                    Semua kamera sedang digunakan. Tambahkan perangkat baru terlebih dahulu.
+                  <Text
+                    style={[
+                      fieldStyles.dropdownEmpty,
+                      isDark && { color: "#9CA3AF" },
+                    ]}
+                  >
+                    Semua kamera sedang digunakan. Tambahkan perangkat baru
+                    terlebih dahulu.
                   </Text>
                 ) : (
                   availableDevices.map((device) => (
                     <TouchableOpacity
                       key={device.id}
-                      style={[fieldStyles.dropdownOption, isDark && { borderBottomColor: "#374151" }]}
+                      style={[
+                        fieldStyles.dropdownOption,
+                        isDark && { borderBottomColor: "#374151" },
+                      ]}
                       onPress={() => {
                         update("deviceId", device.id);
                         setIsDeviceDropdownOpen(false);
@@ -504,10 +621,29 @@ export default function RegisterBabyScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Pilih kamera ${device.name}`}
                     >
-                      <Icon name="videocam-outline" library="ionicons" size={18} color={Colors.secondary} />
+                      <Icon
+                        name="videocam-outline"
+                        library="ionicons"
+                        size={18}
+                        color={Colors.secondary}
+                      />
                       <View style={fieldStyles.dropdownOptionText}>
-                        <Text style={[fieldStyles.dropdownSelectedText, isDark && { color: "#F9FAFB" }]}>{device.name}</Text>
-                        <Text style={[fieldStyles.dropdownMac, isDark && { color: "#9CA3AF" }]}>{device.mac_address}</Text>
+                        <Text
+                          style={[
+                            fieldStyles.dropdownSelectedText,
+                            isDark && { color: "#F9FAFB" },
+                          ]}
+                        >
+                          {device.name}
+                        </Text>
+                        <Text
+                          style={[
+                            fieldStyles.dropdownMac,
+                            isDark && { color: "#9CA3AF" },
+                          ]}
+                        >
+                          {device.mac_address}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))
@@ -536,9 +672,7 @@ export default function RegisterBabyScreen() {
                 size={20}
                 color={Colors.white}
               />
-              <Text style={styles.submitBtnText}>
-                Simpan & Hubungkan Kamera
-              </Text>
+              <Text style={styles.submitBtnText}>Daftarkan Bayi</Text>
             </>
           )}
         </TouchableOpacity>
@@ -555,7 +689,12 @@ export default function RegisterBabyScreen() {
           }}
         >
           <View style={styles.datePickerOverlay}>
-            <View style={[styles.datePickerModal, isDark && { backgroundColor: "#1F2937" }]}>
+            <View
+              style={[
+                styles.datePickerModal,
+                isDark && { backgroundColor: "#1F2937" },
+              ]}
+            >
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity
                   onPress={() => {
@@ -624,41 +763,89 @@ function BedNumberField({
 }) {
   const [letter = "", digits = ""] = value.split("-");
   const [focusedPart, setFocusedPart] = useState<number | null>(null);
-  const letterRef = useRef<TextInput>(null);
-  const firstDigitRef = useRef<TextInput>(null);
-  const secondDigitRef = useRef<TextInput>(null);
+  const letterRef = useRef<TextInputInstance>(null);
+  const firstDigitRef = useRef<TextInputInstance>(null);
+  const secondDigitRef = useRef<TextInputInstance>(null);
 
   const parts = [
-    { index: 0 as const, value: letter, ref: letterRef, label: "Huruf", keyboardType: "default" as const },
-    { index: 1 as const, value: digits[0] ?? "", ref: firstDigitRef, label: "Digit pertama", keyboardType: "number-pad" as const },
-    { index: 2 as const, value: digits[1] ?? "", ref: secondDigitRef, label: "Digit kedua", keyboardType: "number-pad" as const },
+    {
+      index: 0 as const,
+      value: letter,
+      ref: letterRef,
+      label: "Huruf",
+      keyboardType: "default" as const,
+    },
+    {
+      index: 1 as const,
+      value: digits[0] ?? "",
+      ref: firstDigitRef,
+      label: "Digit pertama",
+      keyboardType: "number-pad" as const,
+    },
+    {
+      index: 2 as const,
+      value: digits[1] ?? "",
+      ref: secondDigitRef,
+      label: "Digit kedua",
+      keyboardType: "number-pad" as const,
+    },
   ];
 
   return (
     <View style={fieldStyles.bedNumberWrapper}>
-      <Text style={[fieldStyles.bedNumberLabel, { color: focusedPart !== null ? Colors.secondary : isDark ? "#4B5563" : Colors.border }]}>
+      <Text
+        style={[
+          fieldStyles.bedNumberLabel,
+          {
+            color:
+              focusedPart !== null
+                ? Colors.secondary
+                : isDark
+                  ? "#4B5563"
+                  : Colors.border,
+          },
+        ]}
+      >
         Nomor Tempat Tidur
       </Text>
       <View style={fieldStyles.bedNumberRow}>
         {parts.map((part) => (
           <View key={part.label} style={fieldStyles.bedNumberPart}>
-            {part.index === 1 ? <Text style={[fieldStyles.bedNumberSeparator, isDark && { color: "#9CA3AF" }]}>-</Text> : null}
+            {part.index === 1 ? (
+              <Text
+                style={[
+                  fieldStyles.bedNumberSeparator,
+                  isDark && { color: "#9CA3AF" },
+                ]}
+              >
+                -
+              </Text>
+            ) : null}
             <TextInput
               ref={part.ref}
               style={[
                 fieldStyles.bedNumberInput,
                 {
                   color: isDark ? "#F9FAFB" : Colors.textPrimary,
-                  borderColor: focusedPart === part.index ? Colors.secondary : isDark ? "#4B5563" : Colors.border,
+                  borderColor:
+                    focusedPart === part.index
+                      ? Colors.secondary
+                      : isDark
+                        ? "#4B5563"
+                        : Colors.border,
                   borderWidth: focusedPart === part.index ? 2 : 1,
                   backgroundColor: isDark ? "#111827" : Colors.white,
                 },
               ]}
               value={part.value}
               onChangeText={(text) => {
-                const cleaned = part.index === 0
-                  ? text.replace(/[^a-z]/gi, "").slice(0, 1).toUpperCase()
-                  : text.replace(/\D/g, "").slice(-1);
+                const cleaned =
+                  part.index === 0
+                    ? text
+                        .replace(/[^a-z]/gi, "")
+                        .slice(0, 1)
+                        .toUpperCase()
+                    : text.replace(/\D/g, "").slice(-1);
                 onChangePart(part.index, cleaned);
                 if (cleaned && part.index === 0) {
                   firstDigitRef.current?.focus();
@@ -694,12 +881,32 @@ function Field({
   isDark = false,
 }: FieldProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const borderColor = isFocused ? Colors.secondary : isDark ? "#4B5563" : Colors.border;
+  const borderColor = isFocused
+    ? Colors.secondary
+    : isDark
+      ? "#4B5563"
+      : Colors.border;
 
   return (
     <View style={fieldStyles.wrapper}>
-      <Text style={[fieldStyles.label, { color: borderColor, backgroundColor: isDark ? "#111827" : Colors.white }]}>{label}</Text>
-      <View style={[fieldStyles.inputRow, { borderColor, borderWidth: isFocused ? 2 : 1 }, isDark && { backgroundColor: "#111827" }]}>
+      <Text
+        style={[
+          fieldStyles.label,
+          {
+            color: borderColor,
+            backgroundColor: isDark ? "#111827" : Colors.white,
+          },
+        ]}
+      >
+        {label}
+      </Text>
+      <View
+        style={[
+          fieldStyles.inputRow,
+          { borderColor, borderWidth: isFocused ? 2 : 1 },
+          isDark && { backgroundColor: "#111827" },
+        ]}
+      >
         <Icon
           name={icon}
           library={iconLibrary}
@@ -765,7 +972,11 @@ const fieldStyles = StyleSheet.create({
     fontSize: 18,
     padding: 0,
   },
-  bedNumberSeparator: { fontFamily: Fonts.interSemiBold, fontSize: 18, color: Colors.textMuted },
+  bedNumberSeparator: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 18,
+    color: Colors.textMuted,
+  },
   input: {
     flex: 1,
     fontFamily: Fonts.interRegular,
@@ -802,7 +1013,11 @@ const fieldStyles = StyleSheet.create({
   },
   dropdownOptionText: { flex: 1 },
   dropdownMac: { ...Typography.caption, color: Colors.textMuted },
-  dropdownEmpty: { ...Typography.caption, color: Colors.textMuted, padding: 12 },
+  dropdownEmpty: {
+    ...Typography.caption,
+    color: Colors.textMuted,
+    padding: 12,
+  },
   dropdownPlaceholder: {
     flex: 1,
     fontFamily: Fonts.interRegular,
@@ -835,7 +1050,12 @@ const styles = StyleSheet.create({
     ...Typography.h2,
     color: Colors.secondaryDark,
   },
-  content: { padding: Spacing.xl, gap: Spacing.md, paddingBottom: 40, alignItems: "center" },
+  content: {
+    padding: Spacing.xl,
+    gap: Spacing.md,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
   infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",

@@ -62,7 +62,7 @@ export interface VisionResultPayload {
 }
 
 export interface AudioSecondResult {
-  captureId: string;
+  captureId?: string;
   timestamp: string;
   isCrying: boolean;
   confidence?: number;
