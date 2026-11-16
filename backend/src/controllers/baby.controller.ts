@@ -38,7 +38,7 @@ export const babyController = {
       const { name, bedNumber, dateOfBirth, parentName, deviceId } = req.body;
       const unitId = req.user?.unitId;
 
-      if (!name || !bedNumber || !dateOfBirth || !parentName || !deviceId || !unitId) {
+      if (!name || !bedNumber || !dateOfBirth || !parentName || !unitId) {
         res
           .status(400)
           .json({ success: false, error: "Semua field wajib diisi" });
@@ -65,7 +65,12 @@ export const babyController = {
   async pairDevice(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { babyId, deviceId } = req.body;
-      const data = await babyService.pairDevice(babyId, deviceId);
+      const unitId = req.user?.unitId;
+      if (!babyId || !deviceId || !unitId) {
+        res.status(400).json({ success: false, error: "Bayi dan kamera wajib dipilih" });
+        return;
+      }
+      const data = await babyService.pairDevice(babyId, deviceId, unitId);
       const response: ApiResponse = { success: true, data };
       res.json(response);
     } catch (err: any) {

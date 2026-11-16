@@ -368,8 +368,9 @@ export default function ParentDashboard() {
         {status ? (
           <ActivityCard
             key={`${status.activity}-${status.soundClass}-${status.lastUpdated}`}
-            activity={status.deviceOnline === false ? null : status.activity}
+            activity={status.deviceOnline == null ? null : status.deviceOnline === false ? null : status.activity}
             cameraOnline={status.deviceOnline}
+            cameraPaired={status.deviceOnline !== null}
           />
         ) : (
           <View

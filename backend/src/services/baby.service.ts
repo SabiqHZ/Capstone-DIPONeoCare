@@ -75,7 +75,7 @@ export const babyService = {
     dateOfBirth: string;
     parentName: string;
     unitId: string;
-    deviceId: string;
+    deviceId?: string;
   }) {
     // Generate kode unik, pastikan tidak duplikat
     let uniqueCode = generateUniqueCode();
@@ -110,16 +110,16 @@ export const babyService = {
 
     if (error) throw new Error(error.message);
 
-    const { data: pairedDevice, error: pairError } = await supabaseAdmin
+    const { data: pairedDevice, error: pairError } = payload.deviceId ? await supabaseAdmin
       .from("devices")
       .update({ baby_id: data.id, unit_id: payload.unitId })
       .eq("id", payload.deviceId)
       .is("baby_id", null)
       .or(`unit_id.eq.${payload.unitId},unit_id.is.null`)
       .select("id")
-      .maybeSingle();
+      .maybeSingle() : { data: null, error: null };
 
-    if (pairError || !pairedDevice) {
+    if (pairError || (payload.deviceId && !pairedDevice)) {
       await supabaseAdmin.from("babies").delete().eq("id", data.id);
       throw new Error(pairError?.message ?? "Kamera tidak tersedia atau sudah dipasangkan");
     }
@@ -131,27 +131,33 @@ export const babyService = {
       dateOfBirth: data.date_of_birth,
       parentName: data.parent_name,
       uniqueCode: data.unique_code,
-      deviceId: pairedDevice.id,
+      deviceId: pairedDevice?.id ?? null,
       unitId: data.unit_id,
       createdAt: data.created_at,
     };
   },
 
   // Pairing device ke bayi
-  async pairDevice(babyId: string, deviceId: string) {
+  async pairDevice(babyId: string, deviceId: string, unitId: string) {
     const { data: baby, error: babyError } = await supabaseAdmin
       .from("babies")
       .select("unit_id")
       .eq("id", babyId)
+      .eq("unit_id", unitId)
       .single();
     if (babyError) throw new Error(babyError.message);
 
-    const { error } = await supabaseAdmin
+    const { data: pairedDevice, error } = await supabaseAdmin
       .from("devices")
       .update({ baby_id: babyId, unit_id: baby.unit_id })
-      .eq("id", deviceId);
+      .eq("id", deviceId)
+      .is("baby_id", null)
+      .or(`unit_id.eq.${unitId},unit_id.is.null`)
+      .select("id")
+      .maybeSingle();
 
     if (error) throw new Error(error.message);
+    if (!pairedDevice) throw new Error("Kamera tidak tersedia atau sudah dipasangkan");
     return { success: true };
   },
   async updateBaby(babyId: string, unitId: string, changes: {

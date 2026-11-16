@@ -83,6 +83,10 @@ export default function BabyDetailScreen() {
     useState(false);
   const [isDischarging, setIsDischarging] = useState(false);
   const [isCopySuccessVisible, setIsCopySuccessVisible] = useState(false);
+  const [isDevicePickerOpen, setIsDevicePickerOpen] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<Array<{ id: string; name: string | null; mac_address: string; is_online: boolean }>>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+  const [pairingDeviceId, setPairingDeviceId] = useState<string | null>(null);
 
   const realtimeStatus = useBabyStatusById(id ?? "");
   const allAlerts = useActiveAlerts();
@@ -119,6 +123,34 @@ export default function BabyDetailScreen() {
   }, [id, fetchBaby, setFocused]);
 
   const deviceId = baby?.devices?.id;
+
+  const openDevicePicker = async () => {
+    setIsDevicePickerOpen((open) => !open);
+    if (isDevicePickerOpen) return;
+    setIsLoadingDevices(true);
+    try {
+      setAvailableDevices(await babyService.getAvailableDevices());
+    } catch {
+      Alert.alert("Gagal memuat kamera", "Periksa koneksi lalu coba lagi.");
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  const handlePairCamera = async (availableDeviceId: string) => {
+    if (!baby) return;
+    setPairingDeviceId(availableDeviceId);
+    try {
+      await babyService.pairDevice(baby.id, availableDeviceId);
+      setIsDevicePickerOpen(false);
+      await fetchBaby();
+      Alert.alert("Kamera terpasang", "Kamera berhasil dipasangkan dengan bayi.");
+    } catch {
+      Alert.alert("Gagal memasang kamera", "Kamera mungkin sudah terpasang pada bayi lain. Muat ulang daftar kamera.");
+    } finally {
+      setPairingDeviceId(null);
+    }
+  };
 
   const resetCameraFrames = useCallback(() => {
     setFrameUrls([null, null]);
@@ -357,8 +389,10 @@ export default function BabyDetailScreen() {
 
   // Gunakan satu status klasifikasi yang sama untuk seluruh kartu di detail bayi.
   const noBabyDetected = detectionExpired || activity == null;
-  const faceStatusUnknown = noBabyDetected || faceAnomaly == null;
-  const faceCovered = !faceStatusUnknown && faceAnomaly !== "none";
+  // Deteksi anomali wajah tetap ditampilkan meskipun status aktivitas kosong.
+  const faceCovered =
+    !detectionExpired && faceAnomaly != null && faceAnomaly !== "none";
+  const faceStatusUnknown = !faceCovered && (noBabyDetected || faceAnomaly == null);
 
   const cryingDurationSec = detectionExpired
     ? null
@@ -443,6 +477,17 @@ export default function BabyDetailScreen() {
               icon="person-outline"
               label="Orang Tua"
               value={baby.parent_name}
+            />
+            <InfoItem
+              icon="calendar-outline"
+              label="Tanggal Lahir"
+              value={new Date(
+                `${baby.date_of_birth}T00:00:00`,
+              ).toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
             />
             <InfoItem
               icon="key-outline"
@@ -686,6 +731,7 @@ export default function BabyDetailScreen() {
                   style={[
                     styles.aiCardValue,
                     faceStatusUnknown && { color: Colors.neutral },
+                    faceCovered && { color: Colors.critical },
                   ]}
                 >
                   {faceStatusUnknown
@@ -735,9 +781,27 @@ export default function BabyDetailScreen() {
                   color={Colors.secondary}
                 />
                 <Text style={styles.deviceCardTitle}>
-                  Kamera: {baby.devices?.name || "Smart Vision Cam"}
+                  {baby.devices ? `Kamera: ${baby.devices.name || "Smart Vision Cam"}` : "Belum ada kamera terpasang pada bayi"}
                 </Text>
               </View>
+              {!baby.devices ? (
+                <>
+                  <TouchableOpacity style={styles.reportBtn} onPress={() => void openDevicePicker()} accessibilityRole="button" accessibilityLabel="Pasang kamera">
+                    <Icon name="add-circle-outline" library="ionicons" size={18} color={Colors.secondary} />
+                    <Text style={styles.reportBtnText}>Pasang kamera</Text>
+                  </TouchableOpacity>
+                  {isDevicePickerOpen ? (
+                    <View style={{ gap: 8, marginTop: 10 }}>
+                      {isLoadingDevices ? <ActivityIndicator color={Colors.secondary} /> : availableDevices.length ? availableDevices.map((availableDevice) => (
+                        <TouchableOpacity key={availableDevice.id} style={[styles.reportBtn, { justifyContent: "space-between" }]} onPress={() => void handlePairCamera(availableDevice.id)} disabled={pairingDeviceId !== null}>
+                          <Text style={styles.reportBtnText}>{availableDevice.name || availableDevice.mac_address}{availableDevice.is_online ? " · Aktif" : " · Tidak aktif"}</Text>
+                          {pairingDeviceId === availableDevice.id ? <ActivityIndicator size="small" color={Colors.secondary} /> : null}
+                        </TouchableOpacity>
+                      )) : <Text style={styles.lastUpdated}>Tidak ada kamera tersedia. Pastikan kamera mengirim heartbeat.</Text>}
+                    </View>
+                  ) : null}
+                </>
+              ) : null}
               <View style={styles.infoGrid}>
                 <InfoItem
                   icon="wifi"
@@ -923,11 +987,14 @@ function InfoItem({
           size={13}
           color={Colors.textMuted}
         />
-        <Text style={infoStyles.label}>{label}</Text>
+        <Text style={infoStyles.label} numberOfLines={1}>
+          {label}
+        </Text>
       </View>
       <Text
         style={[infoStyles.value, mono && infoStyles.mono]}
-        numberOfLines={1}
+        numberOfLines={2}
+        ellipsizeMode="tail"
       >
         {value}
       </Text>
@@ -953,8 +1020,8 @@ function InfoItem({
 }
 
 const infoStyles = StyleSheet.create({
-  wrapper: { gap: 3, width: "45%" },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  wrapper: { gap: 3, width: "46%", minWidth: 0 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
   label: {
     fontFamily: Fonts.interRegular,
     fontSize: 11,
@@ -1235,7 +1302,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#111827",
-    transform: [{ rotate: "180deg" }],
   },
   cameraMessageOverlay: {
     position: "absolute",

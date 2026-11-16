@@ -187,7 +187,7 @@ function BabyCard({
               { color: isOnline ? Colors.successDark : Colors.offlineDark },
             ]}
           >
-            {isOnline ? "Aktif" : "Tidak aktif"}
+            {!baby.devices ? "Belum dipasang" : isOnline ? "Aktif" : "Tidak aktif"}
           </Text>
         </View>
       </View>
@@ -217,11 +217,13 @@ function BabyCard({
               { color: activityColor[activityKey] },
             ]}
           >
-          {activityKey === "unknown"
-            ? isOnline
-              ? activityLabel[activityKey]
-              : "Kamera tidak aktif"
-            : activityLabel[activityKey]}
+          {!baby.devices
+            ? "Belum ada kamera terpasang pada bayi"
+            : activityKey === "unknown"
+              ? isOnline
+                ? activityLabel[activityKey]
+                : "Kamera tidak aktif"
+              : activityLabel[activityKey]}
           </Text>
         </View>
 

@@ -10,6 +10,7 @@ import { Radii, Spacing } from "../../constants/ui";
 interface Props {
   activity: BabyActivity | null;
   cameraOnline?: boolean | null;
+  cameraPaired?: boolean;
 }
 
 const activityConfig = {
@@ -46,7 +47,7 @@ const activityConfig = {
   },
 };
 
-export function ActivityCard({ activity, cameraOnline = true }: Props) {
+export function ActivityCard({ activity, cameraOnline = true, cameraPaired = true }: Props) {
   const activityKey = activity ?? "unknown";
   const actCfg = activityConfig[activityKey];
 
@@ -80,8 +81,10 @@ export function ActivityCard({ activity, cameraOnline = true }: Props) {
                 },
               ]}
             >
-              {activityKey === "unknown" && cameraOnline === false
-                ? "Kamera tidak aktif"
+              {!cameraPaired
+                ? "Kamera belum di pasang pada bayi ini"
+                : activityKey === "unknown" && cameraOnline === false
+                  ? "Kamera tidak aktif"
                 : actCfg.label}
             </Text>
           </View>

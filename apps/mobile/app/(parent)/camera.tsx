@@ -74,6 +74,7 @@ export default function CameraScreen() {
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
 
   const [apiDeviceOnline, setApiDeviceOnline] = useState<boolean | null>(null);
+  const [cameraPaired, setCameraPaired] = useState<boolean | null>(null);
   const lastReportFetchedAtRef = useRef(0);
 
   const isDeviceOnline =
@@ -178,6 +179,7 @@ export default function CameraScreen() {
         setStreamUrl(null);
         resetCameraFrames();
         setApiDeviceOnline(null);
+        setCameraPaired(null);
         setHasError(false);
         setIsLoadingDevice(false);
         return;
@@ -209,6 +211,7 @@ export default function CameraScreen() {
           setStreamUrl(null);
           resetCameraFrames();
           setApiDeviceOnline(false);
+          setCameraPaired(false);
           setHasError(true);
 
           return;
@@ -221,6 +224,7 @@ export default function CameraScreen() {
         setApiDeviceOnline(
           typeof device?.is_online === "boolean" ? device.is_online : null,
         );
+        setCameraPaired(true);
 
         setStreamUrl(url);
       } catch (error) {
@@ -230,6 +234,7 @@ export default function CameraScreen() {
           setStreamUrl(null);
           resetCameraFrames();
           setApiDeviceOnline(null);
+          setCameraPaired(null);
           setHasError(true);
         }
       } finally {
@@ -394,6 +399,9 @@ export default function CameraScreen() {
   const videoHeight = isFullscreen ? width * 1.1 : width * 0.75;
 
   const currentActivityLabel = () => {
+    if (cameraPaired === false) {
+      return "Kamera belum di pasang pada bayi ini";
+    }
     if (!isDeviceOnline) {
       return "-";
     }
@@ -420,7 +428,8 @@ export default function CameraScreen() {
   const anomalyType = focusedStatus?.faceAnomaly ?? null;
 
   const hasAnomaly = anomalyType !== null && anomalyType !== "none";
-  const noBabyDetected = currentActivityLabel() === "Tidak ada bayi yang terdeteksi";
+  const noBabyDetected =
+    currentActivityLabel() === "Tidak ada bayi yang terdeteksi";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -474,7 +483,7 @@ export default function CameraScreen() {
                   },
                 ]}
               >
-                {isDeviceOnline ? "Aktif" : "Tidak aktif"}
+                {cameraPaired === false ? "Belum dipasang" : isDeviceOnline ? "Aktif" : "Tidak aktif"}
               </Text>
             </View>
           </View>
@@ -619,11 +628,11 @@ export default function CameraScreen() {
                   {
                     color: !isDeviceOnline
                       ? "#fff"
-                    : noBabyDetected
-                      ? Colors.neutral
-                      : hasAnomaly
-                        ? Colors.critical
-                        : Colors.success,
+                      : noBabyDetected
+                        ? Colors.neutral
+                        : hasAnomaly
+                          ? Colors.critical
+                          : Colors.success,
                   },
                 ]}
               >
@@ -807,7 +816,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
-    transform: [{ rotate: "180deg" }],
   },
 
   centerBox: {

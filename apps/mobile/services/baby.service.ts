@@ -17,7 +17,7 @@ export const babyService = {
     bedNumber: string;
     dateOfBirth: string;
     parentName: string;
-    deviceId: string;
+    deviceId?: string;
   }): Promise<RegisteredBaby> => {
     const res = await api.post("/babies", payload);
     return res.data.data;
@@ -25,6 +25,10 @@ export const babyService = {
 
   pairDevice: async (babyId: string, deviceId: string): Promise<void> => {
     await api.post("/babies/pair", { babyId, deviceId });
+  },
+  getAvailableDevices: async (): Promise<Array<{ id: string; name: string | null; mac_address: string; is_online: boolean }>> => {
+    const res = await api.get("/devices/available");
+    return res.data.data ?? [];
   },
   updateBaby: async (babyId: string, payload: { name: string; bedNumber: string; dateOfBirth: string; parentName: string }) => {
     const response = await api.patch(`/babies/${babyId}`, payload);

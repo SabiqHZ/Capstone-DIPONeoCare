@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -90,9 +90,6 @@ export default function RegisterBabyScreen() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState("");
-  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [registeredBaby, setRegisteredBaby] = useState<RegisteredBaby | null>(
     null,
   );
@@ -103,22 +100,6 @@ export default function RegisterBabyScreen() {
 
   const update = (key: keyof BabyForm, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
-
-  const loadAvailableDevices = async () => {
-    setIsLoadingDevices(true);
-    try {
-      const { api } = await import("../../services/api");
-      const response = await api.get("/devices/available");
-      setAvailableDevices(response.data.data ?? []);
-    } catch (error) {
-      console.error("Gagal memuat kamera tersedia:", error);
-      setAvailableDevices([]);
-    } finally {
-      setIsLoadingDevices(false);
-    }
-  };
-
-  useEffect(() => { void loadAvailableDevices(); }, []);
 
   const updateBedPart = (part: 0 | 1 | 2, value: string) =>
     setForm((current) => {
@@ -170,11 +151,10 @@ export default function RegisterBabyScreen() {
     form.name.trim() !== "" &&
     /^[A-Z]-\d{2}$/.test(form.bedNumber) &&
     form.dateOfBirth.trim() !== "" &&
-    form.parentName.trim() !== "" &&
-    selectedDeviceId !== "";
+    form.parentName.trim() !== "";
 
   const handleSubmit = async () => {
-    if (!isValid || !selectedDeviceId) {
+    if (!isValid) {
       Alert.alert("Lengkapi Data", "Semua data wajib diisi.");
       return;
     }
@@ -198,7 +178,6 @@ export default function RegisterBabyScreen() {
         bedNumber: form.bedNumber.trim(),
         dateOfBirth: apiDate,
         parentName: form.parentName.trim(),
-        deviceId: selectedDeviceId,
       });
 
       // Tandai sukses
@@ -231,10 +210,10 @@ export default function RegisterBabyScreen() {
           </View>
 
           <Text style={[styles.successTitle, isDark && { color: "#A7F3D0" }]}>
-            Bayi & Kamera Tersambung!
+            {registeredBaby.deviceId ? "Bayi & Kamera Tersambung!" : "Bayi Berhasil Didaftarkan"}
           </Text>
           <Text style={[styles.successSub, isDark && { color: "#9CA3AF" }]}>
-            Sistem pemantauan aktif. Berikan kode berikut kepada orang tua.
+            {registeredBaby.deviceId ? "Sistem pemantauan aktif. Berikan kode berikut kepada orang tua." : "Kamera dapat dipasang nanti dari halaman detail bayi. Berikan kode berikut kepada orang tua."}
           </Text>
 
           <View
@@ -368,16 +347,6 @@ export default function RegisterBabyScreen() {
             iconLibrary="material"
             isDark={isDark}
           />
-          <View style={styles.divider} />
-          <View style={{ gap: 10 }}>
-            <Text style={[Typography.body, { color: Colors.textPrimary, fontFamily: Fonts.interSemiBold }, isDark && { color: "#F9FAFB" }]}>Pilih Kamera (wajib)</Text>
-            {isLoadingDevices ? <ActivityIndicator color={Colors.secondary} /> : availableDevices.length ? availableDevices.map((device) => (
-              <TouchableOpacity key={device.id} onPress={() => setSelectedDeviceId(device.id)} style={{ minHeight: 48, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: selectedDeviceId === device.id ? Colors.secondary : Colors.border, backgroundColor: selectedDeviceId === device.id ? Colors.secondaryLight : isDark ? "#111827" : Colors.white }} accessibilityRole="radio" accessibilityState={{ selected: selectedDeviceId === device.id }}>
-                <Text style={{ color: isDark ? "#F9FAFB" : Colors.textPrimary }}>{device.name || device.mac_address}{device.is_online ? " · Aktif" : " · Tidak aktif"}</Text>
-              </TouchableOpacity>
-            )) : <Text style={[Typography.caption, { color: Colors.textMuted }]}>Tidak ada kamera yang tersedia. Pastikan kamera sudah mengirim heartbeat, lalu muat ulang halaman.</Text>}
-            <TouchableOpacity onPress={() => void loadAvailableDevices()} style={{ minHeight: 44, justifyContent: "center" }} accessibilityRole="button" accessibilityLabel="Muat ulang daftar kamera"><Text style={{ color: Colors.secondary }}>Muat ulang kamera</Text></TouchableOpacity>
-          </View>
           <View style={styles.divider} />
           <BedNumberField
             value={form.bedNumber}
