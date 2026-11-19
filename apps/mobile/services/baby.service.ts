@@ -26,6 +26,9 @@ export const babyService = {
   pairDevice: async (babyId: string, deviceId: string): Promise<void> => {
     await api.post("/babies/pair", { babyId, deviceId });
   },
+  unpairDevice: async (babyId: string, deviceId: string): Promise<void> => {
+    await api.post("/babies/unpair", { babyId, deviceId });
+  },
   getAvailableDevices: async (): Promise<Array<{ id: string; name: string | null; mac_address: string; is_online: boolean }>> => {
     const res = await api.get("/devices/available");
     return res.data.data ?? [];

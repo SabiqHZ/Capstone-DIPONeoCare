@@ -282,6 +282,47 @@ export const deviceController = {
       res.status(500).json({ success: false, error: err.message });
     }
   },
+  async listForUnit(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.unitId) {
+        res.status(400).json({ success: false, error: "Unit pengasuh tidak ditemukan" });
+        return;
+      }
+      res.json({
+        success: true,
+        data: await deviceService.getDevicesForUnit(req.user.unitId),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+  async remove(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.unitId) {
+        res.status(400).json({ success: false, error: "Unit pengasuh tidak ditemukan" });
+        return;
+      }
+      const result = await deviceService.deleteUnpairedDevice(
+        req.params.id as string,
+        req.user.unitId,
+      );
+      if (result === "not_found") {
+        res.status(404).json({ success: false, error: "Kamera tidak ditemukan" });
+        return;
+      }
+      if (result === "paired") {
+        res.status(409).json({ success: false, error: "Lepaskan kamera dari bayi sebelum menghapusnya" });
+        return;
+      }
+      if (result === "not_available_for_unit") {
+        res.status(403).json({ success: false, error: "Kamera bukan milik unit pengasuh ini" });
+        return;
+      }
+      res.json({ success: true, message: "Kamera berhasil dihapus" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
   async stream(req: Request, res: Response): Promise<void> {
     const deviceId = req.params.id as string;
 

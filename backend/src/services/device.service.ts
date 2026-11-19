@@ -191,6 +191,60 @@ export const deviceService = {
     return data ?? [];
   },
 
+  async getDevicesForUnit(unitId: string) {
+    const { data: devices, error: devicesError } = await supabaseAdmin
+      .from("devices")
+      .select(
+        "id, mac_address, name, baby_id, unit_id, is_online, last_heartbeat, created_at",
+      )
+      .or(`unit_id.eq.${unitId},unit_id.is.null`)
+      .order("created_at", { ascending: true });
+    if (devicesError) throw new Error(devicesError.message);
+
+    const babyIds = [...new Set((devices ?? []).flatMap((device) => device.baby_id ? [device.baby_id] : []))];
+    if (babyIds.length === 0) {
+      return (devices ?? []).map((device) => ({ ...device, baby: null }));
+    }
+
+    const { data: babies, error: babiesError } = await supabaseAdmin
+      .from("babies")
+      .select("id, name, bed_number")
+      .eq("unit_id", unitId)
+      .in("id", babyIds);
+    if (babiesError) throw new Error(babiesError.message);
+
+    const babiesById = new Map((babies ?? []).map((baby) => [baby.id, baby]));
+    return (devices ?? []).map((device) => ({
+      ...device,
+      baby: device.baby_id ? babiesById.get(device.baby_id) ?? null : null,
+    }));
+  },
+
+  async deleteUnpairedDevice(deviceId: string, unitId: string) {
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("devices")
+      .select("id, baby_id, unit_id")
+      .eq("id", deviceId)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+    if (!existing) return "not_found" as const;
+    if (existing.unit_id && existing.unit_id !== unitId) {
+      return "not_available_for_unit" as const;
+    }
+    if (existing.baby_id) return "paired" as const;
+
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .delete()
+      .eq("id", deviceId)
+      .is("baby_id", null)
+      .or(`unit_id.eq.${unitId},unit_id.is.null`)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? "deleted" as const : "paired" as const;
+  },
+
   async getDeviceConfig(macAddress: string) {
     const { data, error } = await supabaseAdmin
       .from("devices")

@@ -32,7 +32,7 @@ export const authService = {
   },
 
   updateCaregiverProfile: async (changes: {
-    name: string;
+    name?: string;
     username: string;
     currentPassword?: string;
     newPassword?: string;
@@ -67,6 +67,7 @@ export const authService = {
       return {
         id: nurse.id,
         name: nurse.name,
+        username: username.trim(),
         unitId: nurse.unitId,
         token: nurse.token,
         role: "caregiver",

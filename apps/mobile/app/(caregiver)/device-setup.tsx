@@ -268,7 +268,12 @@ export default function DeviceSetupScreen() {
           <Text
             style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
           >
-            4. Setelah terhubung, kembali ke aplikasi ini.
+            4. Masukkan kata sandi jaringan: <Text style={styles.bold}>DIPONeoCare</Text>.
+          </Text>
+          <Text
+            style={[styles.instructionText, isDark && { color: "#D1D5DB" }]}
+          >
+            5. Setelah terhubung, kembali ke aplikasi ini.
           </Text>
 
           {step === 1 && (

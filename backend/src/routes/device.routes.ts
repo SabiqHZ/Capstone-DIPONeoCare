@@ -27,6 +27,18 @@ router.post(
 );
 
 router.get(
+  "/",
+  authMiddleware,
+  requireRole("nurse"),
+  deviceController.listForUnit,
+);
+router.delete(
+  "/:id",
+  authMiddleware,
+  requireRole("nurse"),
+  deviceController.remove,
+);
+router.get(
   "/available",
   authMiddleware,
   requireRole("nurse"),

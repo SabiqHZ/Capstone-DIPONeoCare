@@ -160,6 +160,27 @@ export const babyService = {
     if (!pairedDevice) throw new Error("Kamera tidak tersedia atau sudah dipasangkan");
     return { success: true };
   },
+  async unpairDevice(babyId: string, deviceId: string, unitId: string) {
+    const { data: baby, error: babyError } = await supabaseAdmin
+      .from("babies")
+      .select("id")
+      .eq("id", babyId)
+      .eq("unit_id", unitId)
+      .maybeSingle();
+    if (babyError) throw new Error(babyError.message);
+    if (!baby) throw new Error("Bayi tidak ditemukan pada unit pengasuh ini");
+
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .update({ baby_id: null })
+      .eq("id", deviceId)
+      .eq("baby_id", babyId)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Kamera tersebut tidak terpasang pada bayi ini");
+    return { success: true };
+  },
   async updateBaby(babyId: string, unitId: string, changes: {
     name: string; bedNumber: string; dateOfBirth: string; parentName: string;
   }) {

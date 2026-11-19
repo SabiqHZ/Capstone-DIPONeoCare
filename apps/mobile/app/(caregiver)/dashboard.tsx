@@ -24,6 +24,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 import { babyService } from "../../services/baby.service";
+import { authService } from "../../services/auth.service";
 import { Baby } from "../../types";
 import { MuteToggle } from "../../components/ui/MuteToggle";
 import { ActionButton } from "../../components/ui/ActionButton";
@@ -93,34 +94,38 @@ function BabyCard({
   const activeStatus = realtimeStatuses[baby.id];
   const detectionExpired = Boolean(
     activeStatus?.isDetectionStale ||
-      isBabyDetectionExpired(
-        activeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
-      ),
+    isBabyDetectionExpired(
+      activeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+    ),
   );
 
   const isOnline = activeStatus
     ? activeStatus.deviceOnline
     : (baby.devices?.is_online ?? false);
 
-  const isCrying = !isOnline || detectionExpired
-    ? null
-    : (activeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
+  const isCrying =
+    !isOnline || detectionExpired
+      ? null
+      : (activeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
 
-  const activity = !isOnline || detectionExpired
-    ? null
-    : (activeStatus?.activity ?? baby.baby_statuses?.activity ?? null);
+  const activity =
+    !isOnline || detectionExpired
+      ? null
+      : (activeStatus?.activity ?? baby.baby_statuses?.activity ?? null);
 
-  const faceAnomaly = !isOnline || detectionExpired
-    ? null
-    : (activeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
+  const faceAnomaly =
+    !isOnline || detectionExpired
+      ? null
+      : (activeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
 
   const faceCovered = faceAnomaly != null && faceAnomaly !== "none";
 
-  const cryingSec = !isOnline || detectionExpired
-    ? null
-    : (activeStatus?.cryingDurationSec ??
-      baby.baby_statuses?.crying_duration_sec ??
-      null);
+  const cryingSec =
+    !isOnline || detectionExpired
+      ? null
+      : (activeStatus?.cryingDurationSec ??
+        baby.baby_statuses?.crying_duration_sec ??
+        null);
 
   const activityKey = activity ?? "unknown";
 
@@ -187,7 +192,11 @@ function BabyCard({
               { color: isOnline ? Colors.successDark : Colors.offlineDark },
             ]}
           >
-            {!baby.devices ? "Belum dipasang" : isOnline ? "Aktif" : "Tidak aktif"}
+            {!baby.devices
+              ? "Belum dipasang"
+              : isOnline
+                ? "Aktif"
+                : "Tidak aktif"}
           </Text>
         </View>
       </View>
@@ -217,13 +226,13 @@ function BabyCard({
               { color: activityColor[activityKey] },
             ]}
           >
-          {!baby.devices
-            ? "Belum ada kamera terpasang pada bayi"
-            : activityKey === "unknown"
-              ? isOnline
-                ? activityLabel[activityKey]
-                : "Kamera tidak aktif"
-              : activityLabel[activityKey]}
+            {!baby.devices
+              ? "Belum ada kamera terpasang pada bayi"
+              : activityKey === "unknown"
+                ? isOnline
+                  ? activityLabel[activityKey]
+                  : "Kamera tidak aktif"
+                : activityLabel[activityKey]}
           </Text>
         </View>
 
@@ -252,7 +261,7 @@ function BabyCard({
 
 export default function NurseDashboard() {
   const { isDark, toggleMode } = useTheme();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const router = useRouter();
 
   const [babies, setBabies] = useState<BabyWithStatus[]>([]);
@@ -272,6 +281,20 @@ export default function NurseDashboard() {
   const searchExpansion = useRef(new Animated.Value(0)).current;
   const activeAlerts = useActiveAlerts();
   const { acknowledgeAlert } = useBabyContext();
+
+  useEffect(() => {
+    if (user?.role !== "caregiver" || user.username) return;
+    let isMounted = true;
+    authService
+      .getCaregiverProfile()
+      .then((profile) => {
+        if (isMounted) void setUser({ ...user, username: profile.username });
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [setUser, user]);
 
   useEffect(() => {
     Animated.timing(menuIconProgress, {
@@ -348,16 +371,17 @@ export default function NurseDashboard() {
       const rtStatus = realtimeStatuses[baby.id];
       const detectionExpired = Boolean(
         rtStatus?.isDetectionStale ||
-          isBabyDetectionExpired(
-            rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
-          ),
+        isBabyDetectionExpired(
+          rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+        ),
       );
-      const isCry = !detectionExpired && Boolean(
-        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
-      );
-      const isFace = !detectionExpired && Boolean(
-        rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly,
-      ) && (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly) !== "none";
+      const isCry =
+        !detectionExpired &&
+        Boolean(rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false);
+      const isFace =
+        !detectionExpired &&
+        Boolean(rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly) &&
+        (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly) !== "none";
       const isOn = rtStatus
         ? rtStatus.deviceOnline
         : (baby.devices?.is_online ?? false);
@@ -389,13 +413,13 @@ export default function NurseDashboard() {
       const rtStatus = realtimeStatuses[baby.id];
       const detectionExpired = Boolean(
         rtStatus?.isDetectionStale ||
-          isBabyDetectionExpired(
-            rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
-          ),
+        isBabyDetectionExpired(
+          rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+        ),
       );
-      const isCrying = !detectionExpired && Boolean(
-        rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
-      );
+      const isCrying =
+        !detectionExpired &&
+        Boolean(rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false);
       const faceAnomaly = detectionExpired
         ? null
         : (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
@@ -418,13 +442,13 @@ export default function NurseDashboard() {
         const rtStatus = realtimeStatuses[baby.id];
         const detectionExpired = Boolean(
           rtStatus?.isDetectionStale ||
-            isBabyDetectionExpired(
-              rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
-            ),
+          isBabyDetectionExpired(
+            rtStatus?.lastUpdated ?? baby.baby_statuses?.updated_at,
+          ),
         );
-        const isCrying = !detectionExpired && Boolean(
-          rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false,
-        );
+        const isCrying =
+          !detectionExpired &&
+          Boolean(rtStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? false);
         const faceAnomaly = detectionExpired
           ? null
           : (rtStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
@@ -574,7 +598,7 @@ export default function NurseDashboard() {
         >
           <View style={styles.profileAvatar}>
             <Text style={styles.profileInitial}>
-              {user.name?.trim()?.[0]?.toUpperCase() ?? "P"}
+              {user.username?.trim()?.[0]?.toUpperCase() ?? "P"}
             </Text>
           </View>
           <Icon
@@ -894,6 +918,51 @@ export default function NurseDashboard() {
                     </Text>
                   </View>
                 </TouchableOpacity>
+
+                <View style={styles.dropdownDivider} />
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setIsMenuVisible(false);
+                    router.push("/(caregiver)/camera-list");
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Buka daftar kamera"
+                  accessibilityHint="Menampilkan kamera yang tersedia dan yang terpasang pada bayi"
+                >
+                  <View
+                    style={[
+                      styles.dropdownIconBox,
+                      isDark && { backgroundColor: "#263548" },
+                    ]}
+                  >
+                    <Icon
+                      name="videocam-outline"
+                      library="ionicons"
+                      size={20}
+                      color={isDark ? "#BFDBFE" : Colors.secondaryDark}
+                    />
+                  </View>
+                  <View>
+                    <Text
+                      style={[
+                        styles.dropdownTitle,
+                        isDark && { color: "#F9FAFB" },
+                      ]}
+                    >
+                      Daftar Kamera
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dropdownDesc,
+                        isDark && { color: "#9CA3AF" },
+                      ]}
+                    >
+                      Lihat dan kelola kamera
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -922,7 +991,7 @@ export default function NurseDashboard() {
                     isDark && { color: "#F9FAFB" },
                   ]}
                 >
-                  {user.name}
+                  {user.username || "Pengasuh"}
                 </Text>
                 <Text
                   style={[

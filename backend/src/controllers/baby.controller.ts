@@ -78,6 +78,20 @@ export const babyController = {
       res.status(500).json(response);
     }
   },
+  async unpairDevice(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { babyId, deviceId } = req.body;
+      const unitId = req.user?.unitId;
+      if (!babyId || !deviceId || !unitId) {
+        res.status(400).json({ success: false, error: "Bayi dan kamera wajib dipilih" });
+        return;
+      }
+      const data = await babyService.unpairDevice(babyId, deviceId, unitId);
+      res.json({ success: true, data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
   async updateBaby(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { name, bedNumber, dateOfBirth, parentName } = req.body;

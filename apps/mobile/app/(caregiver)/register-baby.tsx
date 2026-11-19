@@ -210,11 +210,13 @@ export default function RegisterBabyScreen() {
           </View>
 
           <Text style={[styles.successTitle, isDark && { color: "#A7F3D0" }]}>
-            {registeredBaby.deviceId ? "Bayi & Kamera Tersambung!" : "Bayi Berhasil Didaftarkan"}
+            {registeredBaby.deviceId
+              ? "Bayi & Kamera Tersambung!"
+              : "Bayi Berhasil Didaftarkan"}
           </Text>
-          <Text style={[styles.successSub, isDark && { color: "#9CA3AF" }]}>
-            {registeredBaby.deviceId ? "Sistem pemantauan aktif. Berikan kode berikut kepada orang tua." : "Kamera dapat dipasang nanti dari halaman detail bayi. Berikan kode berikut kepada orang tua."}
-          </Text>
+          <Text
+            style={[styles.successSub, isDark && { color: "#9CA3AF" }]}
+          ></Text>
 
           <View
             style={[styles.codeBox, isDark && { backgroundColor: "#26372F" }]}

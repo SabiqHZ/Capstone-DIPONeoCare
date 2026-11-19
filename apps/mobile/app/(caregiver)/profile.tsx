@@ -33,9 +33,7 @@ export default function CaregiverProfileScreen() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const { isDark } = useTheme();
-  const caregiverName = user?.role === "caregiver" ? user.name : "";
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [name, setName] = useState(caregiverName);
   const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
@@ -51,14 +49,12 @@ export default function CaregiverProfileScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const hasUnsavedChanges = useMemo(() => {
-    const savedName = profile?.name ?? caregiverName;
     const savedUsername = profile?.username ?? "";
     return (
-      name.trim() !== savedName ||
       username.trim() !== savedUsername ||
       Boolean(currentPassword || newPassword || confirmPassword)
     );
-  }, [caregiverName, confirmPassword, currentPassword, name, newPassword, profile, username]);
+  }, [confirmPassword, currentPassword, newPassword, profile, username]);
 
   usePreventRemove(hasUnsavedChanges && !allowRemove, ({ repeat }) => {
     pendingRemoveAction.current = repeat;
@@ -89,7 +85,6 @@ export default function CaregiverProfileScreen() {
     try {
       const data = await authService.getCaregiverProfile();
       setProfile(data);
-      setName(data.name);
       setUsername(data.username);
     } catch {
       setProfileError(true);
@@ -119,8 +114,8 @@ export default function CaregiverProfileScreen() {
 
   const handleSaveChanges = async (leaveAfterSave = false) => {
     setErrorMessage("");
-    if (!name.trim() || !username.trim()) {
-      setErrorMessage("Nama dan username wajib diisi.");
+    if (!username.trim()) {
+      setErrorMessage("Username wajib diisi.");
       return;
     }
     const passwordChanged = Boolean(currentPassword || newPassword || confirmPassword);
@@ -144,15 +139,13 @@ export default function CaregiverProfileScreen() {
     setIsSaving(true);
     try {
       const updatedProfile = await authService.updateCaregiverProfile({
-        name: name.trim(),
         username: username.trim(),
         ...(passwordChanged ? { currentPassword, newPassword } : {}),
       });
       setProfile(updatedProfile);
-      setName(updatedProfile.name);
       setUsername(updatedProfile.username);
       if (user?.role === "caregiver") {
-        await setUser({ ...user, name: updatedProfile.name });
+        await setUser({ ...user, username: updatedProfile.username });
       }
       setCurrentPassword("");
       setNewPassword("");
@@ -170,7 +163,6 @@ export default function CaregiverProfileScreen() {
   };
 
   const discardChangesAndLeave = () => {
-    setName(profile?.name ?? caregiverName);
     setUsername(profile?.username ?? "");
     setCurrentPassword("");
     setNewPassword("");
@@ -201,9 +193,9 @@ export default function CaregiverProfileScreen() {
           <View style={[styles.profileCard, isDark && { backgroundColor: "#1F2937" }]}>
             <View style={styles.profileIdentity}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarInitial}>{(name || caregiverName).trim().charAt(0).toUpperCase()}</Text>
+                <Text style={styles.avatarInitial}>{username.trim().charAt(0).toUpperCase() || "P"}</Text>
               </View>
-              <Text style={[styles.profileName, isDark && { color: "#F9FAFB" }]}>{name || caregiverName}</Text>
+              <Text style={[styles.profileName, isDark && { color: "#F9FAFB" }]}>{username || "Username"}</Text>
               <Text style={[styles.profileRole, isDark && { color: "#9CA3AF" }]}>Pengasuh</Text>
             </View>
 
@@ -217,7 +209,6 @@ export default function CaregiverProfileScreen() {
               </View>
             ) : null}
 
-            <TextField isDark={isDark} label="Nama" value={name} onChangeText={setName} editable={!isSaving && !isLoading} />
             <TextField isDark={isDark} label="Username" value={username} onChangeText={setUsername} editable={!isSaving && !isLoading} autoCapitalize="none" />
 
             <View style={[styles.sectionDivider, isDark && { backgroundColor: "#374151" }]} />

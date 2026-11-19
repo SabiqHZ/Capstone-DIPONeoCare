@@ -4,6 +4,7 @@ export interface CaregiverUser {
   role: "caregiver";
   id: string;
   name: string;
+  username?: string;
   unitId: string;
   token: string;
 }
