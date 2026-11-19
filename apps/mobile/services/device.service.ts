@@ -12,6 +12,9 @@ export const deviceService = {
   async deleteDevice(deviceId: string): Promise<void> {
     await api.delete(`/devices/${encodeURIComponent(deviceId)}`);
   },
+  async updateDeviceName(deviceId: string, name: string): Promise<void> {
+    await api.patch(`/devices/${encodeURIComponent(deviceId)}/name`, { name });
+  },
   async getStreamUrl(deviceId: string): Promise<string> {
     const encodedDeviceId = encodeURIComponent(deviceId);
     return `${STREAM_API_URL.replace(/\/+$/, "")}/api/devices/${encodedDeviceId}/stream`;

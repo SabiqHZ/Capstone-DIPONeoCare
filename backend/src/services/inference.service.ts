@@ -25,6 +25,7 @@ type FinalizedStatus = {
   updatedAt: string;
 };
 const ANOMALY_CONTINUITY_GAP_MS = 1_500;
+const ANOMALY_MIN_DURATION_MS = 10_000;
 const AUDIO_WINDOW_DURATION_MS = 5_000;
 
 type AudioWindow = {
@@ -352,18 +353,17 @@ export const inferenceService = {
       throw new Error(error.message);
     }
 
-    /*
-     * Tidak ada anomaly pada frame saat ini.
-     * Kalau sebelumnya ada event aktif, event dianggap selesai.
-     */
+    const currentDetectedAt = Date.parse(payload.timestamp);
+    if (Number.isNaN(currentDetectedAt)) {
+      throw new Error("Timestamp anomaly tidak valid");
+    }
+
+    // Deteksi singkat tidak dibuat sebagai anomaly event dan tidak memicu alert.
     if (!payload.anomaly.detected) {
       if (active) {
         const { error: resolveError } = await supabaseAdmin
           .from("anomaly_events")
-          .update({
-            resolved_at: payload.timestamp,
-            last_detected_at: payload.timestamp,
-          })
+          .update({ resolved_at: payload.timestamp })
           .eq("id", active.id);
 
         if (resolveError) {
@@ -373,20 +373,12 @@ export const inferenceService = {
 
       return null;
     }
-
-    const currentDetectedAt = Date.parse(payload.timestamp);
-
-    if (Number.isNaN(currentDetectedAt)) {
-      throw new Error("Timestamp anomaly tidak valid");
-    }
-
     let event = active;
 
-    /*
-     * Kalau event aktif ada dan jenis anomaly sama,
-     * cek apakah detection masih kontinu.
-     */
-    if (event && event.anomaly_type === payload.anomaly.type) {
+    // Satu anomaly berlanjut selama deteksi tidak terputus lebih dari 1,5 detik.
+    // Perubahan kelas (contoh: bantal menjadi guling) tetap dihitung sebagai
+    // anomaly berkelanjutan; kelas terakhir dipakai pada event dan notifikasi.
+    if (event) {
       const lastDetectedAt = Date.parse(event.last_detected_at);
 
       if (Number.isNaN(lastDetectedAt)) {
@@ -408,11 +400,6 @@ export const inferenceService = {
         return null;
       }
 
-      /*
-       * Gap terlalu besar:
-       * event lama selesai dan detection sekarang menjadi
-       * event baru.
-       */
       if (gapMs > ANOMALY_CONTINUITY_GAP_MS) {
         const { error: resolveError } = await supabaseAdmin
           .from("anomaly_events")
@@ -428,26 +415,50 @@ export const inferenceService = {
         }
 
         event = null;
+      } else {
+        const { data, error: updateError } = await supabaseAdmin
+          .from("anomaly_events")
+          .update({
+            last_detected_at: payload.timestamp,
+            anomaly_type: payload.anomaly.type,
+          })
+          .eq("id", event.id)
+          .select()
+          .single();
+        if (updateError) throw new Error(updateError.message);
+        event = data;
       }
     }
 
-    /*
-     * Tidak ada event aktif, jenis anomaly berubah,
-     * atau event lama sudah diputus karena gap.
-     * Buat event baru.
-     */
-    if (!event || event.anomaly_type !== payload.anomaly.type) {
-      if (event && event.anomaly_type !== payload.anomaly.type) {
-        const { error: resolveError } = await supabaseAdmin
-          .from("anomaly_events")
-          .update({
-            resolved_at: payload.timestamp,
-          })
-          .eq("id", event.id);
+    // Jika belum ada event aktif, hitung durasi dari rangkaian hasil vision
+    // yang berurutan. Event baru disimpan setelah berlangsung sekurangnya 10s.
+    if (!event) {
+      const historyStart = new Date(
+        currentDetectedAt - ANOMALY_MIN_DURATION_MS - ANOMALY_CONTINUITY_GAP_MS,
+      ).toISOString();
+      const { data: recentDetections, error: historyError } = await supabaseAdmin
+        .from("ai_vision_results")
+        .select("captured_at, anomaly_detected")
+        .eq("device_id", device.id)
+        .gte("captured_at", historyStart)
+        .lte("captured_at", payload.timestamp)
+        .order("captured_at", { ascending: false })
+        .limit(1_000);
+      if (historyError) throw new Error(historyError.message);
 
-        if (resolveError) {
-          throw new Error(resolveError.message);
-        }
+      let segmentStart = currentDetectedAt;
+      let previousTime = currentDetectedAt;
+      for (const detection of recentDetections ?? []) {
+        const detectedAt = Date.parse(detection.captured_at);
+        if (!Number.isFinite(detectedAt) || detectedAt > previousTime) continue;
+        if (previousTime - detectedAt > ANOMALY_CONTINUITY_GAP_MS) break;
+        if (!detection.anomaly_detected) break;
+        segmentStart = detectedAt;
+        previousTime = detectedAt;
+      }
+
+      if (currentDetectedAt - segmentStart < ANOMALY_MIN_DURATION_MS) {
+        return null;
       }
 
       const { data, error: insertError } = await supabaseAdmin
@@ -456,7 +467,7 @@ export const inferenceService = {
           baby_id: device.baby_id,
           device_id: device.id,
           anomaly_type: payload.anomaly.type,
-          started_at: payload.timestamp,
+          started_at: new Date(segmentStart).toISOString(),
           last_detected_at: payload.timestamp,
         })
         .select()
@@ -467,36 +478,9 @@ export const inferenceService = {
       }
 
       event = data;
-    } else {
-      /*
-       * Detection masih kontinu.
-       * Update last_detected_at.
-       */
-      const { data, error: updateError } = await supabaseAdmin
-        .from("anomaly_events")
-        .update({
-          last_detected_at: payload.timestamp,
-        })
-        .eq("id", event.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
-
-      event = data;
     }
 
-    /*
-     * Hitung durasi hanya dari event yang benar-benar
-     * kontinu.
-     */
-    const durationSeconds =
-      (Date.parse(event.last_detected_at) - Date.parse(event.started_at)) /
-      1_000;
-
-    // Kirim satu alert segera ketika anomaly pertama kali terdeteksi.
+    // Event dan alert baru dibuat setelah melewati ambang 10 detik.
     if (!event.alert_sent_at) {
       const alert = await alertService.createAlert({
         babyId: device.baby_id,

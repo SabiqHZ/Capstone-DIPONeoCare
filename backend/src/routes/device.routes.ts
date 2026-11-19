@@ -38,6 +38,12 @@ router.delete(
   requireRole("nurse"),
   deviceController.remove,
 );
+router.patch(
+  "/:id/name",
+  authMiddleware,
+  requireRole("nurse"),
+  deviceController.updateName,
+);
 router.get(
   "/available",
   authMiddleware,

@@ -323,6 +323,35 @@ export const deviceController = {
       res.status(500).json({ success: false, error: err.message });
     }
   },
+  async updateName(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user?.unitId) {
+        res.status(400).json({ success: false, error: "Unit pengasuh tidak ditemukan" });
+        return;
+      }
+      const { name } = req.body ?? {};
+      if (typeof name !== "string" || !name.trim()) {
+        res.status(400).json({ success: false, error: "Nama kamera wajib diisi" });
+        return;
+      }
+      if (name.trim().length > 40) {
+        res.status(400).json({ success: false, error: "Nama kamera maksimal 40 karakter" });
+        return;
+      }
+      const updated = await deviceService.updateDeviceName(
+        req.params.id as string,
+        req.user.unitId,
+        name.trim(),
+      );
+      if (!updated) {
+        res.status(404).json({ success: false, error: "Kamera tidak ditemukan" });
+        return;
+      }
+      res.json({ success: true, data: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
   async stream(req: Request, res: Response): Promise<void> {
     const deviceId = req.params.id as string;
 

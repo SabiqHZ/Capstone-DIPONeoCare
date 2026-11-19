@@ -245,6 +245,18 @@ export const deviceService = {
     return data ? "deleted" as const : "paired" as const;
   },
 
+  async updateDeviceName(deviceId: string, unitId: string, name: string) {
+    const { data, error } = await supabaseAdmin
+      .from("devices")
+      .update({ name })
+      .eq("id", deviceId)
+      .or(`unit_id.eq.${unitId},unit_id.is.null`)
+      .select("id, name")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   async getDeviceConfig(macAddress: string) {
     const { data, error } = await supabaseAdmin
       .from("devices")
