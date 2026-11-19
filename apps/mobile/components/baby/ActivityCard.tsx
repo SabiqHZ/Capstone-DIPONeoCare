@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 import { Icon } from "../ui/Icon";
 import { BabyActivity } from "../../types";
@@ -11,6 +11,7 @@ interface Props {
   activity: BabyActivity | null;
   cameraOnline?: boolean | null;
   cameraPaired?: boolean;
+  onContactCaregiver?: () => void;
 }
 
 const activityConfig = {
@@ -47,7 +48,7 @@ const activityConfig = {
   },
 };
 
-export function ActivityCard({ activity, cameraOnline = true, cameraPaired = true }: Props) {
+export function ActivityCard({ activity, cameraOnline = true, cameraPaired = true, onContactCaregiver }: Props) {
   const activityKey = activity ?? "unknown";
   const actCfg = activityConfig[activityKey];
 
@@ -91,6 +92,19 @@ export function ActivityCard({ activity, cameraOnline = true, cameraPaired = tru
 
         </View>
       </View>
+      {activityKey === "crying" && onContactCaregiver ? (
+        <TouchableOpacity
+          style={styles.contactButton}
+          onPress={onContactCaregiver}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Hubungi pengasuh melalui WhatsApp"
+          accessibilityHint="Membuka WhatsApp dengan pesan bahwa bayi sedang menangis"
+        >
+          <Icon name="logo-whatsapp" library="ionicons" size={19} color={Colors.white} />
+          <Text style={styles.contactButtonText}>Hubungi Pengasuh</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -99,6 +113,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radii.card,
     padding: Spacing.cardPadding,
+    gap: 12,
   },
 
   top: {
@@ -133,6 +148,20 @@ const styles = StyleSheet.create({
   activityLabelUnavailable: {
     fontSize: 15,
     lineHeight: 21,
+  },
+  contactButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: "#1F9D55",
+  },
+  contactButtonText: {
+    ...Typography.bodyStrong,
+    color: Colors.white,
   },
 
 });

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   BackHandler,
   KeyboardAvoidingView,
   Modal,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, usePreventRemove, useRouter } from "expo-router";
@@ -199,7 +199,7 @@ export default function CaregiverProfileScreen() {
               <Text style={[styles.profileRole, isDark && { color: "#9CA3AF" }]}>Pengasuh</Text>
             </View>
 
-            {isLoading ? <ActivityIndicator color={Colors.secondary} style={styles.profileLoader} /> : null}
+            {isLoading ? <LoadingLogo color={Colors.secondary} style={styles.profileLoader} /> : null}
             {profileError ? (
               <View style={styles.loadError}>
                 <Text style={styles.loadErrorText}>Profil gagal dimuat. Periksa koneksi lalu coba lagi.</Text>
@@ -240,7 +240,7 @@ export default function CaregiverProfileScreen() {
               activeOpacity={0.8}
               accessibilityRole="button"
             >
-              {isSaving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.saveButtonText}>Simpan perubahan</Text>}
+              {isSaving ? <LoadingLogo color={Colors.white} /> : <Text style={styles.saveButtonText}>Simpan perubahan</Text>}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -276,7 +276,7 @@ export default function CaregiverProfileScreen() {
                 disabled={isSaving}
                 accessibilityRole="button"
               >
-                {isSaving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.confirmationSaveText}>Simpan</Text>}
+                {isSaving ? <LoadingLogo color={Colors.white} /> : <Text style={styles.confirmationSaveText}>Simpan</Text>}
               </TouchableOpacity>
             </View>
           </View>

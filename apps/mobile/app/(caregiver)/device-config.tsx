@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
@@ -250,11 +251,15 @@ export default function DeviceConfigScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            colors={[Colors.secondary]}
-            tintColor={Colors.secondary}
+            colors={["transparent"]}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* Deteksi Tangisan */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>

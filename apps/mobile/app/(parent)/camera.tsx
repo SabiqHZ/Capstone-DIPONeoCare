@@ -7,11 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator,
   Image,
   ScrollView,
   RefreshControl,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 
 import Svg, { Path } from "react-native-svg";
 
@@ -441,12 +441,15 @@ export default function CameraScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#fff"
-            colors={["#1D9E75"]}
-            progressBackgroundColor="#161616"
+            tintColor="transparent"
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* HEADER */}
         <View style={styles.header}>
           <Text style={styles.title}>Kamera Langsung</Text>
@@ -551,7 +554,7 @@ export default function CameraScreen() {
                     </>
                   ) : (
                     <>
-                      <ActivityIndicator color="#1D9E75" />
+                      <LoadingLogo color="#1D9E75" />
 
                       <Text style={styles.centerText}>
                         Memuat gambar kamera...
@@ -563,7 +566,7 @@ export default function CameraScreen() {
             </>
           ) : isLoadingDevice ? (
             <View style={styles.centerBox}>
-              <ActivityIndicator size="large" />
+              <LoadingLogo size="large" />
 
               <Text style={styles.centerText}>Menghubungkan ke kamera...</Text>
             </View>

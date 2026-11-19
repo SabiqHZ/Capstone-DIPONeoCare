@@ -8,12 +8,13 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
   Alert,
+  Linking,
   Modal,
   Pressable,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
@@ -37,6 +38,7 @@ import { Fonts, Typography } from "../../constants/fonts";
 import { ControlSize, Radii, Spacing } from "../../constants/ui";
 
 import { DailyReport } from "../../types";
+import { CONFIG } from "../../constants/config";
 import { formatDurationMinutes } from "../../utils/duration";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "../../context/ThemeContext";
@@ -221,6 +223,22 @@ export default function ParentDashboard() {
     setIsLogoutConfirmVisible(true);
   };
 
+  const handleContactCaregiver = async (reason: "crying" | "anomaly") => {
+    const message =
+      reason === "crying"
+        ? "Halo Pengasuh, bayi saya sedang menangis. Mohon bantu periksa."
+        : "Halo Pengasuh, wajah bayi saya terdeteksi tertutupi. Mohon bantu periksa.\n\n";
+    const whatsappUrl = `https://wa.me/${CONFIG.CAREGIVER_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    try {
+      await Linking.openURL(whatsappUrl);
+    } catch {
+      Alert.alert(
+        "Tidak dapat membuka WhatsApp",
+        `Silakan hubungi pengasuh di nomor +${CONFIG.CAREGIVER_WHATSAPP_NUMBER}.`,
+      );
+    }
+  };
+
   const formatRelativeTime = (timestamp: string | null) => {
     if (!timestamp) return "belum tersedia";
 
@@ -293,11 +311,15 @@ export default function ParentDashboard() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
+            colors={["transparent"]}
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* =====================================================
             HEADER
         ====================================================== */}
@@ -371,6 +393,7 @@ export default function ParentDashboard() {
             activity={status.deviceOnline == null ? null : status.deviceOnline === false ? null : status.activity}
             cameraOnline={status.deviceOnline}
             cameraPaired={status.deviceOnline !== null}
+            onContactCaregiver={() => void handleContactCaregiver("crying")}
           />
         ) : (
           <View
@@ -379,7 +402,7 @@ export default function ParentDashboard() {
               isDark && { backgroundColor: "#1F2937" },
             ]}
           >
-            <ActivityIndicator size="small" color="#1D9E75" />
+            <LoadingLogo size="small" color="#1D9E75" />
 
             <Text
               style={[
@@ -463,6 +486,7 @@ export default function ParentDashboard() {
           visible={showFaceAnomaly}
           onDismiss={() => setFaceAnomalyDismissed(true)}
           anomalyType={status?.faceAnomaly}
+          onContactCaregiver={() => void handleContactCaregiver("anomaly")}
         />
 
         {/* =====================================================
@@ -502,7 +526,7 @@ export default function ParentDashboard() {
 
           {isReportLoading ? (
             <View style={styles.reportLoading}>
-              <ActivityIndicator size="small" color="#1D9E75" />
+              <LoadingLogo size="small" color="#1D9E75" />
 
               <Text style={styles.reportLoadingText}>Memuat ringkasan...</Text>
             </View>
@@ -579,7 +603,7 @@ export default function ParentDashboard() {
               isDark && { backgroundColor: "#1F2937" },
             ]}
           >
-            <ActivityIndicator size="small" color="#1D9E75" />
+            <LoadingLogo size="small" color="#1D9E75" />
 
             <Text style={styles.loadingText}>Memuat informasi bayi...</Text>
           </View>
@@ -811,7 +835,7 @@ export default function ParentDashboard() {
                 accessibilityRole="button"
               >
                 {isLoggingOut ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
+                  <LoadingLogo size="small" color={Colors.white} />
                 ) : (
                   <Text style={styles.logoutConfirmText}>Keluar</Text>
                 )}
@@ -873,12 +897,14 @@ const styles = StyleSheet.create({
   },
 
   headerRight: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
 
   logoutBtn: {
-    width: 68,
-    minHeight: 68,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },

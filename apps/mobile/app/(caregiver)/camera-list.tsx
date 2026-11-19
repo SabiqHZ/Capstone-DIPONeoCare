@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
@@ -45,10 +44,6 @@ export default function CameraListScreen() {
   const [pairingCameraId, setPairingCameraId] = useState<string | null>(null);
   const [pairableBabies, setPairableBabies] = useState<PairableBaby[]>([]);
   const [isLoadingBabies, setIsLoadingBabies] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<ManagedDevice | null>(null);
-  const [editedName, setEditedName] = useState("");
-  const [editNameError, setEditNameError] = useState("");
-  const [isSavingName, setIsSavingName] = useState(false);
 
   const loadDevices = useCallback(async (refresh = false) => {
     refresh ? setIsRefreshing(true) : setIsLoading(true);
@@ -90,43 +85,6 @@ export default function CameraListScreen() {
     setFeedback("");
     setFeedbackIsError(false);
     setPendingAction({ type: "delete", device });
-  };
-
-  const openNameEditor = (device: ManagedDevice) => {
-    setEditedName(device.name ?? "");
-    setEditNameError("");
-    setEditingDevice(device);
-  };
-
-  const saveDeviceName = async () => {
-    const name = editedName.trim();
-    if (!name) {
-      setEditNameError("Nama kamera wajib diisi.");
-      return;
-    }
-    if (name.length > 40) {
-      setEditNameError("Maksimal 40 karakter.");
-      return;
-    }
-    if (!editingDevice) return;
-
-    setIsSavingName(true);
-    setEditNameError("");
-    try {
-      await deviceService.updateDeviceName(editingDevice.id, name);
-      setDevices((current) =>
-        current.map((device) =>
-          device.id === editingDevice.id ? { ...device, name } : device,
-        ),
-      );
-      setEditingDevice(null);
-      setFeedback("Nama kamera diperbarui.");
-      setFeedbackIsError(false);
-    } catch (err: any) {
-      setEditNameError(err.response?.data?.error || "Nama kamera gagal disimpan.");
-    } finally {
-      setIsSavingName(false);
-    }
   };
 
   const toggleBabyPicker = async (deviceId: string) => {
@@ -247,11 +205,16 @@ export default function CameraListScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
             onRefresh={() => void loadDevices(true)}
-            colors={[Colors.secondary]}
+            colors={["transparent"]}
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         <Text style={[styles.description, isDark && dark.muted]}>
           Status kamera dan pemasangannya.
         </Text>
@@ -293,7 +256,7 @@ export default function CameraListScreen() {
 
         {isLoading ? (
           <View style={styles.stateBox}>
-            <ActivityIndicator size="large" color={Colors.secondary} />
+            <LoadingLogo size="large" color={Colors.secondary} />
             <Text style={[styles.stateText, isDark && dark.muted]}>
               Memuat daftar kamera…
             </Text>
@@ -382,6 +345,8 @@ export default function CameraListScreen() {
             {devices.map((device, index) => {
               const isUsed = Boolean(device.baby_id);
               const isBusy = busyId === device.id;
+              // The API returns devices in installation order (created_at ascending).
+              const cameraName = `cam-${String(index + 1).padStart(2, "0")}`;
               return (
                 <View key={device.id}>
                   <View
@@ -394,28 +359,12 @@ export default function CameraListScreen() {
                     ]}
                   >
                     <View style={styles.headerCamera}>
-                      <View style={styles.cameraNameCell}>
-                        <Text
-                          style={[styles.deviceName, isDark && dark.heading]}
-                          numberOfLines={2}
-                        >
-                          {device.name || "Kamera"}
-                        </Text>
-                        <TouchableOpacity
-                          style={styles.editNameButton}
-                          onPress={() => openNameEditor(device)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Edit nama kamera ${device.name || "ini"}`}
-                          accessibilityHint="Membuka kolom untuk mengubah nama kamera"
-                        >
-                          <Icon
-                            name="create-outline"
-                            library="ionicons"
-                            size={14}
-                            color={isDark ? "#BFDBFE" : Colors.secondaryDark}
-                          />
-                        </TouchableOpacity>
-                      </View>
+                      <Text
+                        style={[styles.deviceName, isDark && dark.heading]}
+                        numberOfLines={1}
+                      >
+                        {cameraName}
+                      </Text>
                     </View>
                     <View style={[styles.headerInstall, styles.centerCell]}>
                       <Text
@@ -485,7 +434,7 @@ export default function CameraListScreen() {
                           accessibilityLabel={`Lepaskan kamera dari ${device.baby?.name || "bayi"}`}
                         >
                           {isBusy ? (
-                            <ActivityIndicator
+                            <LoadingLogo
                               size="small"
                               color={Colors.critical}
                             />
@@ -518,7 +467,7 @@ export default function CameraListScreen() {
                             accessibilityLabel={`Hapus kamera ${device.name || "ini"}`}
                           >
                             {isBusy ? (
-                              <ActivityIndicator
+                              <LoadingLogo
                                 size="small"
                                 color={Colors.critical}
                               />
@@ -541,7 +490,7 @@ export default function CameraListScreen() {
                       style={[styles.babyPicker, isDark && dark.pickerSurface]}
                     >
                       {isLoadingBabies ? (
-                        <ActivityIndicator color={Colors.secondary} />
+                        <LoadingLogo color={Colors.secondary} />
                       ) : pairableBabies.length ? (
                         <>
                           <Text
@@ -582,7 +531,7 @@ export default function CameraListScreen() {
                                 </Text>
                               </View>
                               {isBusy ? (
-                                <ActivityIndicator
+                                <LoadingLogo
                                   size="small"
                                   color={Colors.secondary}
                                 />
@@ -672,89 +621,13 @@ export default function CameraListScreen() {
                 accessibilityRole="button"
               >
                 {busyId ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
+                  <LoadingLogo size="small" color={Colors.white} />
                 ) : (
                   <Text style={styles.confirmActionText}>
                     {pendingAction?.type === "delete"
                       ? "Hapus kamera"
                       : "Lepaskan"}
                   </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={Boolean(editingDevice)}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => {
-          if (!isSavingName) setEditingDevice(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => {
-              if (!isSavingName) setEditingDevice(null);
-            }}
-          />
-          <View
-            style={[styles.editNameCard, isDark && dark.surface]}
-            accessibilityViewIsModal
-          >
-            <View style={styles.editNameIcon}>
-              <Icon
-                name="create-outline"
-                library="ionicons"
-                size={24}
-                color={Colors.secondaryDark}
-              />
-            </View>
-            <Text style={[styles.editNameTitle, isDark && dark.heading]}>
-              Edit nama kamera
-            </Text>
-            <TextInput
-              style={[styles.editNameInput, isDark && dark.editInput]}
-              value={editedName}
-              onChangeText={(value) => {
-                setEditedName(value.slice(0, 40));
-                setEditNameError("");
-              }}
-              placeholder="Nama kamera"
-              placeholderTextColor={isDark ? "#9CA3AF" : Colors.textMuted}
-              maxLength={40}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={() => void saveDeviceName()}
-              accessibilityLabel="Nama kamera"
-            />
-            {editNameError ? (
-              <Text style={styles.editNameError}>{editNameError}</Text>
-            ) : null}
-            <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={[styles.cancelButton, isDark && dark.cancelButton]}
-                onPress={() => setEditingDevice(null)}
-                disabled={isSavingName}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.cancelText, isDark && dark.body]}>
-                  Batal
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.editNameSaveButton}
-                onPress={() => void saveDeviceName()}
-                disabled={isSavingName || !editedName.trim()}
-                accessibilityRole="button"
-              >
-                {isSavingName ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
-                ) : (
-                  <Text style={styles.editNameSaveText}>Simpan</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -815,7 +688,6 @@ const dark = StyleSheet.create({
   babyRow: { backgroundColor: "#263548" },
   pickerSurface: { backgroundColor: "#1F2937", borderColor: "#374151" },
   babyOption: { backgroundColor: "#263548", borderColor: "#374151" },
-  editInput: { backgroundColor: "#111827", color: "#F9FAFB", borderColor: "#4B5563" },
   cancelButton: { backgroundColor: "#1F2937", borderColor: "#4B5563" },
 });
 
@@ -926,8 +798,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  cameraNameCell: { flexDirection: "row", alignItems: "center", gap: 1 },
-  editNameButton: { width: 22, height: 28, alignItems: "center", justifyContent: "center" },
   tableValue: {
     fontFamily: Fonts.interMedium,
     fontSize: 9,
@@ -1148,61 +1018,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   confirmActionText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
-    color: Colors.white,
-  },
-  editNameCard: {
-    width: "100%",
-    maxWidth: 380,
-    padding: 22,
-    gap: 12,
-    alignItems: "center",
-    borderRadius: 22,
-    backgroundColor: Colors.white,
-    elevation: 10,
-  },
-  editNameIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.secondaryLight,
-  },
-  editNameTitle: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 17,
-    color: Colors.textPrimary,
-    textAlign: "center",
-  },
-  editNameInput: {
-    width: "100%",
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontFamily: Fonts.interRegular,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.white,
-  },
-  editNameError: {
-    alignSelf: "flex-start",
-    fontFamily: Fonts.interRegular,
-    fontSize: 11,
-    color: Colors.critical,
-  },
-  editNameSaveButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.secondary,
-  },
-  editNameSaveText: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 13,
     color: Colors.white,

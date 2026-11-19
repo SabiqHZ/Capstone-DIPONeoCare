@@ -7,12 +7,12 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   PermissionsAndroid,
   Platform,
   RefreshControl,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { useRouter } from "expo-router";
 import WifiManager from "react-native-wifi-reborn";
 import type { WifiEntry } from "react-native-wifi-reborn";
@@ -226,11 +226,15 @@ export default function DeviceSetupScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            colors={[Colors.secondary]}
-            tintColor={Colors.secondary}
+            colors={["transparent"]}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* Step 1: Instruksi Koneksi Fisik */}
         <View
           style={[
@@ -318,7 +322,7 @@ export default function DeviceSetupScreen() {
                 <View style={styles.networkScanSection}>
                   {isScanningNetworks ? (
                     <View style={styles.scanStatus}>
-                      <ActivityIndicator
+                      <LoadingLogo
                         size="small"
                         color={Colors.secondary}
                       />
@@ -496,7 +500,7 @@ export default function DeviceSetupScreen() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={Colors.white} />
+                <LoadingLogo color={Colors.white} />
               ) : (
                 <>
                   <Icon

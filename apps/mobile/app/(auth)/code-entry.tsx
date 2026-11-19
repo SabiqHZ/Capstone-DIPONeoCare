@@ -6,16 +6,17 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Alert,
   Linking,
   useWindowDimensions,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { useRouter } from "expo-router";
 import { OtpInput } from "../../components/ui/OtpInput";
 import { useAuthStore } from "../../stores/auth.store";
+import { CONFIG } from "../../constants/config";
 import { authService } from "../../services/auth.service";
 import { Typography } from "../../constants/fonts";
 import { Colors } from "../../constants/colors";
@@ -69,11 +70,13 @@ export default function CodeEntryScreen() {
 
   const handleContactCaregiver = async () => {
     try {
-      await Linking.openURL("https://wa.me/6282221023983");
+      await Linking.openURL(
+        `https://wa.me/${CONFIG.CAREGIVER_WHATSAPP_NUMBER}`,
+      );
     } catch {
       Alert.alert(
         "Tidak dapat membuka WhatsApp",
-        "Silakan hubungi pengasuh melalui WhatsApp di nomor +62 822-2102-3983.",
+        `Silakan hubungi pengasuh melalui WhatsApp di nomor +${CONFIG.CAREGIVER_WHATSAPP_NUMBER}.`,
       );
     }
   };
@@ -147,7 +150,7 @@ export default function CodeEntryScreen() {
                 activeOpacity={0.8}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <LoadingLogo color="#fff" />
                 ) : (
                   <Text style={styles.btnText}>Masuk</Text>
                 )}

@@ -6,13 +6,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   Alert,
   Image,
   Modal,
   Pressable,
+  StatusBar,
 } from "react-native";
+import { LoadingLogo } from "../../../components/ui/LoadingLogo";
 import { BlurView } from "expo-blur";
 import * as Clipboard from "expo-clipboard";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -65,6 +66,8 @@ export default function BabyDetailScreen() {
 
   const [baby, setBaby] = useState<BabyDetail | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [cameraDisplayName, setCameraDisplayName] = useState("Kamera");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [frameUrls, setFrameUrls] = useState<[string | null, string | null]>([
     null,
     null,
@@ -132,6 +135,37 @@ export default function BabyDetailScreen() {
   }, [id, fetchBaby, setFocused]);
 
   const deviceId = baby?.devices?.id;
+
+  useEffect(() => {
+    let cancelled = false;
+    const fallbackName = baby?.devices?.name?.trim() || "Kamera";
+
+    if (!deviceId) {
+      setCameraDisplayName("Kamera");
+      return;
+    }
+
+    setCameraDisplayName(fallbackName);
+    void deviceService
+      .getManagedDevices()
+      .then((devices) => {
+        const cameraIndex = devices.findIndex(
+          (device) => device.id === deviceId,
+        );
+        if (!cancelled && cameraIndex >= 0) {
+          setCameraDisplayName(
+            `cam-${String(cameraIndex + 1).padStart(2, "0")}`,
+          );
+        }
+      })
+      .catch(() => {
+        // Keep the camera's existing name if its position cannot be loaded.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId, baby?.devices?.name]);
 
   const openDevicePicker = async () => {
     setIsDevicePickerOpen((open) => !open);
@@ -329,6 +363,14 @@ export default function BabyDetailScreen() {
     });
   };
 
+  const openBabyReport = () => {
+    if (!baby) return;
+    router.push({
+      pathname: "/(caregiver)/baby/report",
+      params: { babyId: baby.id, babyName: baby.name },
+    });
+  };
+
   const handleDischarge = () => {
     if (!id) {
       Alert.alert("Gagal", "Informasi bayi tidak ditemukan.");
@@ -371,8 +413,10 @@ export default function BabyDetailScreen() {
       <SafeAreaView style={[styles.safe, isDark && darkStyles.safe]}>
         <Header backOnly title="Detail Bayi" isDark={isDark} />
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={Colors.secondary} />
-          <Text style={[styles.loadingText, isDark && darkStyles.mutedText]}>Memuat data...</Text>
+          <LoadingLogo size="large" color={Colors.secondary} />
+          <Text style={[styles.loadingText, isDark && darkStyles.mutedText]}>
+            Memuat data...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -414,27 +458,26 @@ export default function BabyDetailScreen() {
     ),
   );
 
-  const isCrying = detectionExpired
-    ? null
-    : (realtimeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
-
-  const faceAnomaly = detectionExpired
-    ? null
-    : (realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
-
   const activity = detectionExpired
     ? null
     : (realtimeStatus?.activity ?? baby.baby_statuses?.activity ?? null);
 
   // Gunakan satu status klasifikasi yang sama untuk seluruh kartu di detail bayi.
   const noBabyDetected = detectionExpired || activity == null;
-  // Deteksi anomali wajah tetap ditampilkan meskipun status aktivitas kosong.
+  const isCrying = noBabyDetected
+    ? null
+    : (realtimeStatus?.isCrying ?? baby.baby_statuses?.is_crying ?? null);
+
+  const faceAnomaly = noBabyDetected
+    ? null
+    : (realtimeStatus?.faceAnomaly ?? baby.baby_statuses?.face_anomaly ?? null);
+
   const faceCovered =
-    !detectionExpired && faceAnomaly != null && faceAnomaly !== "none";
+    !noBabyDetected && faceAnomaly != null && faceAnomaly !== "none";
   const faceStatusUnknown =
     !faceCovered && (noBabyDetected || faceAnomaly == null);
 
-  const cryingDurationSec = detectionExpired
+  const cryingDurationSec = noBabyDetected
     ? null
     : (realtimeStatus?.cryingDurationSec ??
       baby.baby_statuses?.crying_duration_sec ??
@@ -442,6 +485,101 @@ export default function BabyDetailScreen() {
 
   const lastUpdated =
     realtimeStatus?.lastUpdated ?? baby.baby_statuses?.updated_at ?? null;
+
+  const renderCameraStream = () => (
+    <>
+      {streamUrl ? (
+        <>
+          {frameUrls[0] ? (
+            <Image
+              key={`caregiver-camera-0-${frameUrls[0]}`}
+              source={{ uri: frameUrls[0] }}
+              style={[
+                styles.cameraImage,
+                { opacity: hasFrame && activeFrameIndex === 0 ? 1 : 0 },
+              ]}
+              resizeMode="contain"
+              fadeDuration={0}
+              onLoad={() => handleFrameLoaded(0, frameUrls[0])}
+              onError={() => handleFrameError(0, frameUrls[0])}
+            />
+          ) : null}
+
+          {frameUrls[1] ? (
+            <Image
+              key={`caregiver-camera-1-${frameUrls[1]}`}
+              source={{ uri: frameUrls[1] }}
+              style={[
+                styles.cameraImage,
+                { opacity: hasFrame && activeFrameIndex === 1 ? 1 : 0 },
+              ]}
+              resizeMode="contain"
+              fadeDuration={0}
+              onLoad={() => handleFrameLoaded(1, frameUrls[1])}
+              onError={() => handleFrameError(1, frameUrls[1])}
+            />
+          ) : null}
+
+          {!hasFrame ? (
+            <View style={styles.cameraMessageOverlay}>
+              {hasStreamError ? (
+                <Text
+                  style={[styles.offlineSub, isDark && darkStyles.bodyText]}
+                >
+                  Mencoba kembali secara otomatis...
+                </Text>
+              ) : (
+                <>
+                  <LoadingLogo color={Colors.secondary} size="large" />
+                  <Text
+                    style={[styles.waitingText, isDark && darkStyles.bodyText]}
+                  >
+                    Memuat gambar kamera...
+                  </Text>
+                </>
+              )}
+              <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
+                Pembaruan terakhir perangkat:{" "}
+                {baby.devices?.last_heartbeat
+                  ? new Date(baby.devices.last_heartbeat).toLocaleString(
+                      "id-ID",
+                    )
+                  : "Belum pernah"}
+              </Text>
+            </View>
+          ) : null}
+        </>
+      ) : isLoadingStream ? (
+        <View style={styles.cameraMessageOverlay}>
+          <LoadingLogo color={Colors.secondary} size="large" />
+          <Text style={[styles.waitingText, isDark && darkStyles.bodyText]}>
+            Menghubungkan ke kamera...
+          </Text>
+        </View>
+      ) : hasStreamError ? (
+        <View style={styles.cameraMessageOverlay}>
+          <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
+            Gagal menyiapkan tampilan kamera langsung
+          </Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => void fetchStreamUrl()}
+          >
+            <Text style={styles.retryText}>Coba Lagi</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.cameraMessageOverlay}>
+          <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
+            Tampilan kamera langsung belum tersedia
+          </Text>
+          <Text style={[styles.offlineSub, isDark && darkStyles.bodyText]}>
+            Periksa pemasangan dan koneksi perangkat kamera.
+          </Text>
+        </View>
+      )}
+    </>
+  );
 
   return (
     <SafeAreaView style={[styles.safe, isDark && darkStyles.safe]}>
@@ -460,7 +598,10 @@ export default function BabyDetailScreen() {
             color={isDark ? "#BFDBFE" : Colors.secondaryDark}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDark && darkStyles.heading]} numberOfLines={1}>
+        <Text
+          style={[styles.headerTitle, isDark && darkStyles.heading]}
+          numberOfLines={1}
+        >
           {baby.name}
         </Text>
         <TouchableOpacity
@@ -475,7 +616,13 @@ export default function BabyDetailScreen() {
             name="settings-outline"
             library="ionicons"
             size={22}
-            color={isDevicePaired ? (isDark ? "#BFDBFE" : Colors.secondaryDark) : Colors.textDisabled}
+            color={
+              isDevicePaired
+                ? isDark
+                  ? "#BFDBFE"
+                  : Colors.secondaryDark
+                : Colors.textDisabled
+            }
           />
         </TouchableOpacity>
       </View>
@@ -486,11 +633,16 @@ export default function BabyDetailScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
             onRefresh={handleRefresh}
-            colors={[Colors.secondary]}
+            colors={["transparent"]}
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* Info Box */}
         <View style={[styles.infoCard, isDark && darkStyles.surface]}>
           <View style={styles.infoRow}>
@@ -504,7 +656,9 @@ export default function BabyDetailScreen() {
                 />
               </View>
               <View>
-                <Text style={[styles.infoName, isDark && darkStyles.heading]}>{baby.name}</Text>
+                <Text style={[styles.infoName, isDark && darkStyles.heading]}>
+                  {baby.name}
+                </Text>
                 <Text style={[styles.infoBed, isDark && darkStyles.mutedText]}>
                   Tempat Tidur {baby.bed_number}
                 </Text>
@@ -573,7 +727,11 @@ export default function BabyDetailScreen() {
               size={17}
               color={isDark ? "#BFDBFE" : Colors.secondaryDark}
             />
-            <Text style={[styles.copyParentCodeText, isDark && darkStyles.linkText]}>Edit informasi bayi</Text>
+            <Text
+              style={[styles.copyParentCodeText, isDark && darkStyles.linkText]}
+            >
+              Edit informasi bayi
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -604,139 +762,51 @@ export default function BabyDetailScreen() {
               size={48}
               color={Colors.textDisabled}
             />
-            <Text style={[styles.noPairTitle, isDark && darkStyles.heading]}>Kamera Belum Terpasang</Text>
+            <Text style={[styles.noPairTitle, isDark && darkStyles.heading]}>
+              Kamera Belum Terpasang
+            </Text>
             <Text style={[styles.noPairText, isDark && darkStyles.bodyText]}>
               Bayi ini tidak terikat dengan perangkat kamera manapun.
             </Text>
           </View>
         ) : (
           <>
-            {/* Stream memakai polling /frame + double buffering, sama dengan Parents. */}
-            <View style={styles.cameraContainer}>
-              {streamUrl ? (
-                <>
-                  {frameUrls[0] ? (
-                    <Image
-                      key={`caregiver-camera-0-${frameUrls[0]}`}
-                      source={{ uri: frameUrls[0] }}
-                      style={[
-                        styles.cameraImage,
-                        { opacity: hasFrame && activeFrameIndex === 0 ? 1 : 0 },
-                      ]}
-                      resizeMode="contain"
-                      fadeDuration={0}
-                      onLoad={() => handleFrameLoaded(0, frameUrls[0])}
-                      onError={() => handleFrameError(0, frameUrls[0])}
-                    />
-                  ) : null}
-
-                  {frameUrls[1] ? (
-                    <Image
-                      key={`caregiver-camera-1-${frameUrls[1]}`}
-                      source={{ uri: frameUrls[1] }}
-                      style={[
-                        styles.cameraImage,
-                        { opacity: hasFrame && activeFrameIndex === 1 ? 1 : 0 },
-                      ]}
-                      resizeMode="contain"
-                      fadeDuration={0}
-                      onLoad={() => handleFrameLoaded(1, frameUrls[1])}
-                      onError={() => handleFrameError(1, frameUrls[1])}
-                    />
-                  ) : null}
-
-                  {!hasFrame ? (
-                    <View style={styles.cameraMessageOverlay}>
-                      {hasStreamError ? (
-                        <>
-                          <Text style={[styles.offlineSub, isDark && darkStyles.bodyText]}>
-                            Mencoba kembali secara otomatis...
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <ActivityIndicator
-                            color={Colors.secondary}
-                            size="large"
-                          />
-                          <Text style={[styles.waitingText, isDark && darkStyles.bodyText]}>
-                            Memuat gambar kamera...
-                          </Text>
-                        </>
-                      )}
-                      <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
-                        Pembaruan terakhir perangkat:{" "}
-                        {baby.devices?.last_heartbeat
-                          ? new Date(
-                              baby.devices.last_heartbeat,
-                            ).toLocaleString("id-ID")
-                          : "Belum pernah"}
-                      </Text>
-                    </View>
-                  ) : null}
-                </>
-              ) : isLoadingStream ? (
-                <View style={styles.cameraMessageOverlay}>
-                  <ActivityIndicator color={Colors.secondary} size="large" />
-                  <Text style={[styles.waitingText, isDark && darkStyles.bodyText]}>
-                    Menghubungkan ke kamera...
-                  </Text>
-                </View>
-              ) : hasStreamError ? (
-                <View style={styles.cameraMessageOverlay}>
-                  <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
-                    Gagal menyiapkan tampilan kamera langsung
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.retryBtn}
-                    onPress={() => void fetchStreamUrl()}
-                  >
-                    <Text style={styles.retryText}>Coba Lagi</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.cameraMessageOverlay}>
-                  <Text style={[styles.offlineText, isDark && darkStyles.bodyText]}>
-                    Tampilan kamera langsung belum tersedia
-                  </Text>
-                  <Text style={[styles.offlineSub, isDark && darkStyles.bodyText]}>
-                    Periksa pemasangan dan koneksi perangkat kamera.
-                  </Text>
-                </View>
-              )}
-
-              {hasFrame ? (
-                <View style={styles.liveBadge}>
-                  <Text style={styles.liveText}> LANGSUNG</Text>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={styles.reportBtn}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(caregiver)/baby/report",
-                    params: { babyId: baby.id, babyName: baby.name },
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Buka laporan bayi"
-              >
-                <Icon
-                  name="bar-chart-outline"
-                  library="ionicons"
-                  size={16}
-                  color={Colors.success}
-                />
-                <Text style={[styles.reportBtnText, isDark && darkStyles.linkText]}>Laporan</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Keep frame polling and display logic unchanged between regular and full screen. */}
+            {!isFullscreen ? (
+              <View style={styles.cameraContainer}>
+                {renderCameraStream()}
+                {hasFrame ? (
+                  <View style={styles.liveBadge}>
+                    <Text style={styles.liveText}> LANGSUNG</Text>
+                  </View>
+                ) : null}
+                <Text
+                  style={styles.cameraNameBadge}
+                  numberOfLines={1}
+                  accessibilityLabel={`Nama kamera ${cameraDisplayName}`}
+                >
+                  {cameraDisplayName}
+                </Text>
+                <TouchableOpacity
+                  style={styles.fullscreenButton}
+                  onPress={() => setIsFullscreen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Buka kamera layar penuh"
+                  accessibilityHint="Menampilkan kamera memenuhi layar"
+                >
+                  <Icon
+                    name="expand-outline"
+                    library="ionicons"
+                    size={19}
+                    color={Colors.white}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {/* Status AI Komprehensif */}
             <View style={styles.aiStatusGrid}>
-              <View
+              <TouchableOpacity
                 style={[
                   styles.aiCard,
                   isCrying === true ? styles.cryActive : styles.normalCard,
@@ -745,6 +815,11 @@ export default function BabyDetailScreen() {
                       ? darkStyles.criticalCard
                       : darkStyles.aiCard),
                 ]}
+                onPress={openBabyReport}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Buka laporan suara bayi"
+                accessibilityHint="Membuka laporan harian bayi ini"
               >
                 <Icon
                   name={
@@ -758,10 +833,16 @@ export default function BabyDetailScreen() {
                   size={24}
                   color={isCrying === true ? Colors.critical : Colors.success}
                 />
-                <Text style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}>Suara</Text>
-                <Text style={[styles.aiCardValue, isDark && darkStyles.heading]}>
+                <Text
+                  style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}
+                >
+                  Suara
+                </Text>
+                <Text
+                  style={[styles.aiCardValue, isDark && darkStyles.heading]}
+                >
                   {isCrying === null
-                    ? "Tidak ada bayi yang terdeteksi"
+                    ? "Tidak terdeteksi"
                     : isCrying
                       ? `Menangis${
                           cryingDurationSec != null
@@ -770,17 +851,20 @@ export default function BabyDetailScreen() {
                         }`
                       : "Tenang"}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              <View
+              <TouchableOpacity
                 style={[
                   styles.aiCard,
                   faceCovered ? styles.anomalyActive : styles.normalCard,
                   isDark &&
-                    (faceCovered
-                      ? darkStyles.criticalCard
-                      : darkStyles.aiCard),
+                    (faceCovered ? darkStyles.criticalCard : darkStyles.aiCard),
                 ]}
+                onPress={openBabyReport}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Buka laporan kondisi wajah bayi"
+                accessibilityHint="Membuka laporan harian bayi ini"
               >
                 <Icon
                   name={
@@ -800,7 +884,11 @@ export default function BabyDetailScreen() {
                         : Colors.success
                   }
                 />
-                <Text style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}>Kondisi wajah</Text>
+                <Text
+                  style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}
+                >
+                  Kondisi wajah
+                </Text>
                 <Text
                   style={[
                     styles.aiCardValue,
@@ -811,163 +899,268 @@ export default function BabyDetailScreen() {
                 >
                   {faceStatusUnknown
                     ? noBabyDetected
-                      ? "Tidak ada bayi yang terdeteksi"
+                      ? "Tidak terdeteksi"
                       : "Menunggu hasil pemantauan"
                     : faceCovered
                       ? "Tertutupi!"
                       : "Terlihat"}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.aiCard, styles.normalCard, isDark && darkStyles.aiCard]}>
+              <TouchableOpacity
+                style={[
+                  styles.aiCard,
+                  styles.normalCard,
+                  isDark && darkStyles.aiCard,
+                ]}
+                onPress={openBabyReport}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Buka laporan aktivitas bayi"
+                accessibilityHint="Membuka laporan harian bayi ini"
+              >
                 <Icon
                   name="body-outline"
                   library="ionicons"
                   size={24}
                   color={Colors.success}
                 />
-                <Text style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}>Aktivitas</Text>
-                <Text style={[styles.aiCardValue, isDark && darkStyles.heading]}>
+                <Text
+                  style={[styles.aiCardLabel, isDark && darkStyles.mutedText]}
+                >
+                  Aktivitas
+                </Text>
+                <Text
+                  style={[styles.aiCardValue, isDark && darkStyles.heading]}
+                >
                   {activity === null
-                    ? "Tidak ada bayi yang terdeteksi"
+                    ? "Tidak terdeteksi"
                     : activity === "sleeping"
                       ? "Tidur"
                       : activity === "awake"
                         ? "Bangun"
                         : "Menangis"}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
             <Text style={[styles.lastUpdated, isDark && darkStyles.mutedText]}>
               {detectionExpired
-                ? "Tidak ada bayi yang terdeteksi · terakhir diperbarui "
+                ? "Tidak terdeteksi · terakhir diperbarui "
                 : "Diperbarui: "}
               {lastUpdated
                 ? new Date(lastUpdated).toLocaleTimeString("id-ID")
                 : "Menunggu hasil pemantauan"}
             </Text>
 
-            <View style={[styles.deviceCard, isDark && darkStyles.surface]}>
-              <View style={styles.deviceCardHeader}>
-                <Icon
-                  name="cctv"
-                  library="material"
-                  size={18}
-                  color={Colors.secondary}
-                />
-                <Text style={[styles.deviceCardTitle, isDark && darkStyles.heading]}>
-                  {baby.devices
-                    ? `Kamera: ${baby.devices.name || "Smart Vision Cam"}`
-                    : "Kamera belum terpasang"}
-                </Text>
-              </View>
-              {!baby.devices ? (
-                <>
-                  <TouchableOpacity
-                    style={[styles.installCameraBtn, isDark && darkStyles.softAction]}
-                    onPress={() => void openDevicePicker()}
-                    accessibilityRole="button"
-                    accessibilityLabel="Pasang kamera"
-                  >
-                    <Icon
-                      name="add-circle-outline"
-                      library="ionicons"
-                      size={16}
-                      color={Colors.secondary}
-                    />
-                    <Text style={[styles.installCameraBtnText, isDark && darkStyles.linkText]}>
-                      Pasang kamera
-                    </Text>
-                  </TouchableOpacity>
-                  {isDevicePickerOpen ? (
-                    <View style={[styles.cameraDropdown, isDark && darkStyles.surfaceAlt]}>
-                      {isLoadingDevices ? (
-                        <ActivityIndicator color={Colors.secondary} />
-                      ) : availableDevices.length ? (
-                        availableDevices.map((availableDevice) => (
-                          <TouchableOpacity
-                            key={availableDevice.id}
-                            style={[styles.cameraDropdownOption, isDark && darkStyles.surfaceAlt]}
-                            onPress={() =>
-                              void handlePairCamera(availableDevice.id)
-                            }
-                            disabled={pairingDeviceId !== null}
-                          >
-                            <Text style={[styles.reportBtnText, isDark && darkStyles.linkText]}>
-                              {availableDevice.name ||
-                                availableDevice.mac_address}
-                              {availableDevice.is_online
-                                ? " · Aktif"
-                                : " · Tidak aktif"}
-                            </Text>
-                            {pairingDeviceId === availableDevice.id ? (
-                              <ActivityIndicator
-                                size="small"
-                                color={Colors.secondary}
-                              />
-                            ) : null}
-                          </TouchableOpacity>
-                        ))
-                      ) : (
-                        <Text style={[styles.lastUpdated, isDark && darkStyles.mutedText]}>
-                          Tidak ada kamera tersedia.
-                        </Text>
-                      )}
-                    </View>
-                  ) : null}
-                </>
-              ) : null}
-              {baby.devices ? (
-                <View style={styles.infoGrid}>
-                  <InfoItem
-                    icon="wifi"
-                    label="Kode kamera"
-                    value={baby.devices.mac_address}
-                    mono
-                    isDark={isDark}
+            {!baby.devices ? (
+              <View style={[styles.deviceCard, isDark && darkStyles.surface]}>
+                <View style={styles.deviceCardHeader}>
+                  <Icon
+                    name="cctv"
+                    library="material"
+                    size={18}
+                    color={Colors.secondary}
                   />
+                  <Text
+                    style={[styles.deviceCardTitle, isDark && darkStyles.heading]}
+                  >
+                    Kamera belum terpasang
+                  </Text>
                 </View>
-              ) : null}
-              {baby.devices ? (
                 <TouchableOpacity
-                  style={[styles.unpairCameraBtn, isDark && darkStyles.cancelButton]}
-                  onPress={handleUnpairCamera}
-                  disabled={pairingDeviceId !== null}
+                  style={[
+                    styles.installCameraBtn,
+                    isDark && darkStyles.softAction,
+                  ]}
+                  onPress={() => void openDevicePicker()}
                   accessibilityRole="button"
-                  accessibilityLabel="Lepas kamera dari bayi"
+                  accessibilityLabel="Pasang kamera"
                 >
-                  {pairingDeviceId === "unpair" ? (
-                    <ActivityIndicator size="small" color={Colors.critical} />
-                  ) : (
-                    <Icon
-                      name="unlink"
-                      library="material"
-                      size={16}
-                      color={Colors.critical}
-                    />
-                  )}
-                  <Text style={styles.unpairCameraBtnText}>Lepas kamera</Text>
+                  <Icon
+                    name="add-circle-outline"
+                    library="ionicons"
+                    size={16}
+                    color={Colors.secondary}
+                  />
+                  <Text
+                    style={[
+                      styles.installCameraBtnText,
+                      isDark && darkStyles.linkText,
+                    ]}
+                  >
+                    Pasang kamera
+                  </Text>
                 </TouchableOpacity>
-              ) : null}
-            </View>
+                {isDevicePickerOpen ? (
+                  <View
+                    style={[
+                      styles.cameraDropdown,
+                      isDark && darkStyles.surfaceAlt,
+                    ]}
+                  >
+                    {isLoadingDevices ? (
+                      <LoadingLogo color={Colors.secondary} />
+                    ) : availableDevices.length ? (
+                      availableDevices.map((availableDevice) => (
+                        <TouchableOpacity
+                          key={availableDevice.id}
+                          style={[
+                            styles.cameraDropdownOption,
+                            isDark && darkStyles.surfaceAlt,
+                          ]}
+                          onPress={() =>
+                            void handlePairCamera(availableDevice.id)
+                          }
+                          disabled={pairingDeviceId !== null}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Pasang ${availableDevice.name || "kamera"}`}
+                        >
+                          <Text
+                            style={[
+                              styles.reportBtnText,
+                              isDark && darkStyles.linkText,
+                            ]}
+                          >
+                            {availableDevice.name || "Kamera"}
+                            {availableDevice.is_online
+                              ? " · Aktif"
+                              : " · Tidak aktif"}
+                          </Text>
+                          {pairingDeviceId === availableDevice.id ? (
+                            <LoadingLogo
+                              size="small"
+                              color={Colors.secondary}
+                            />
+                          ) : null}
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text
+                        style={[
+                          styles.lastUpdated,
+                          isDark && darkStyles.mutedText,
+                        ]}
+                      >
+                        Tidak ada kamera tersedia.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
           </>
         )}
-
-        <View style={[styles.dangerCard, isDark && darkStyles.surface]}>
+        <View style={[styles.cameraActionsCard, isDark && darkStyles.surface]}>
           <TouchableOpacity
-            style={styles.dischargeBtn}
+            style={[
+              styles.cameraActionButton,
+              styles.primaryCameraAction,
+              isDark && darkStyles.softAction,
+            ]}
+            onPress={() =>
+              router.push({
+                pathname: "/(caregiver)/baby/report",
+                params: { babyId: baby.id, babyName: baby.name },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Buka laporan bayi"
+          >
+            <Icon
+              name="bar-chart-outline"
+              library="ionicons"
+              size={17}
+              color={Colors.success}
+            />
+            <Text
+              style={[styles.cameraActionText, isDark && darkStyles.linkText]}
+            >
+              Laporan
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.cameraActionButton,
+              styles.secondaryCameraAction,
+              isDark && darkStyles.dangerAction,
+              (!baby.devices || pairingDeviceId !== null) && [
+                styles.disabledCameraAction,
+                isDark && darkStyles.disabledAction,
+              ],
+            ]}
+            onPress={handleUnpairCamera}
+            disabled={!baby.devices || pairingDeviceId !== null}
+            accessibilityRole="button"
+            accessibilityLabel="Lepas kamera dari bayi"
+            accessibilityHint="Lepaskan kamera yang terpasang pada bayi ini"
+          >
+            {pairingDeviceId === "unpair" ? (
+              <LoadingLogo size="small" color={Colors.critical} />
+            ) : null}
+            <Text
+              style={[
+                styles.cameraActionText,
+                styles.criticalActionText,
+                !baby.devices && styles.disabledCameraActionText,
+              ]}
+            >
+              Lepas kamera
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.dischargeIconButton,
+              isDark && darkStyles.dangerAction,
+            ]}
             onPress={handleDischarge}
+            accessibilityRole="button"
+            accessibilityLabel="Keluarkan bayi dari sistem"
+            accessibilityHint="Membuka konfirmasi untuk mengeluarkan bayi"
           >
             <Icon
               name="exit-outline"
               library="ionicons"
-              size={18}
+              size={20}
               color={Colors.critical}
             />
-            <Text style={styles.dischargeBtnText}>Keluarkan Bayi</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <StatusBar hidden={isFullscreen} />
+      <Modal
+        visible={isFullscreen && isDevicePaired}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setIsFullscreen(false)}
+      >
+        <View style={styles.fullscreenRoot}>
+          <View style={styles.fullscreenCameraContainer}>
+            {renderCameraStream()}
+            {hasFrame ? (
+              <View style={styles.liveBadge}>
+                <Text style={styles.liveText}>LANGSUNG</Text>
+              </View>
+            ) : null}
+            <Text style={styles.fullscreenCameraName} numberOfLines={1}>
+              {cameraDisplayName}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.fullscreenExitButton}
+            onPress={() => setIsFullscreen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Keluar dari layar penuh"
+            accessibilityHint="Kembali ke detail bayi"
+          >
+            <Icon
+              name="contract-outline"
+              library="ionicons"
+              size={22}
+              color={Colors.white}
+            />
+          </TouchableOpacity>
+        </View>
+      </Modal>
       <Modal
         visible={isDischargeConfirmVisible}
         transparent
@@ -1008,19 +1201,33 @@ export default function BabyDetailScreen() {
                 color={Colors.critical}
               />
             </View>
-            <Text style={[styles.confirmTitle, isDark && darkStyles.heading]}>Keluarkan Bayi</Text>
-            <Text style={[styles.confirmMessage, isDark && darkStyles.bodyText]}>
+            <Text style={[styles.confirmTitle, isDark && darkStyles.heading]}>
+              Keluarkan Bayi
+            </Text>
+            <Text
+              style={[styles.confirmMessage, isDark && darkStyles.bodyText]}
+            >
               Yakin ingin mengeluarkan {baby?.name} dari sistem? Kamera yang
               terhubung akan dilepas dari bayi ini.
             </Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity
-                style={[styles.confirmCancelButton, isDark && darkStyles.cancelButton]}
+                style={[
+                  styles.confirmCancelButton,
+                  isDark && darkStyles.cancelButton,
+                ]}
                 onPress={() => setIsDischargeConfirmVisible(false)}
                 disabled={isDischarging}
                 accessibilityRole="button"
               >
-                <Text style={[styles.confirmCancelText, isDark && darkStyles.bodyText]}>Batal</Text>
+                <Text
+                  style={[
+                    styles.confirmCancelText,
+                    isDark && darkStyles.bodyText,
+                  ]}
+                >
+                  Batal
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmDischargeButton}
@@ -1029,7 +1236,7 @@ export default function BabyDetailScreen() {
                 accessibilityRole="button"
               >
                 {isDischarging ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
+                  <LoadingLogo size="small" color={Colors.white} />
                 ) : (
                   <Text style={styles.confirmDischargeText}>Keluarkan</Text>
                 )}
@@ -1050,7 +1257,15 @@ export default function BabyDetailScreen() {
 }
 
 // ── Komponen Pembantu ──────────────────────────────────────────────────
-function Header({ backOnly, title, isDark = false }: { backOnly: boolean; title: string; isDark?: boolean }) {
+function Header({
+  backOnly,
+  title,
+  isDark = false,
+}: {
+  backOnly: boolean;
+  title: string;
+  isDark?: boolean;
+}) {
   const router = useRouter();
   return (
     <View style={[styles.header, isDark && darkStyles.surface]}>
@@ -1068,7 +1283,9 @@ function Header({ backOnly, title, isDark = false }: { backOnly: boolean; title:
           color={isDark ? "#BFDBFE" : Colors.secondaryDark}
         />
       </TouchableOpacity>
-      <Text style={[styles.headerTitle, isDark && darkStyles.heading]}>{title}</Text>
+      <Text style={[styles.headerTitle, isDark && darkStyles.heading]}>
+        {title}
+      </Text>
       <View style={{ width: 32 }} />
     </View>
   );
@@ -1104,12 +1321,19 @@ function InfoItem({
           size={13}
           color={isDark ? "#9CA3AF" : Colors.textMuted}
         />
-        <Text style={[infoStyles.label, isDark && darkStyles.mutedText]} numberOfLines={1}>
+        <Text
+          style={[infoStyles.label, isDark && darkStyles.mutedText]}
+          numberOfLines={1}
+        >
           {label}
         </Text>
       </View>
       <Text
-        style={[infoStyles.value, mono && infoStyles.mono, isDark && (mono ? darkStyles.linkText : darkStyles.heading)]}
+        style={[
+          infoStyles.value,
+          mono && infoStyles.mono,
+          isDark && (mono ? darkStyles.linkText : darkStyles.heading),
+        ]}
         numberOfLines={2}
         ellipsizeMode="tail"
       >
@@ -1167,6 +1391,8 @@ const darkStyles = StyleSheet.create({
   mutedText: { color: "#9CA3AF" },
   linkText: { color: "#BFDBFE" },
   softAction: { backgroundColor: "#263548", borderColor: "#374151" },
+  dangerAction: { backgroundColor: "#3B2025", borderColor: "#7F1D1D" },
+  disabledAction: { backgroundColor: "#1F2937", borderColor: "#374151" },
   aiCard: { backgroundColor: "#1F2937", borderColor: "#374151" },
   criticalCard: { backgroundColor: "#3B2025", borderColor: "#7F1D1D" },
   cancelButton: { borderColor: "#4B5563" },
@@ -1425,6 +1651,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.1)",
   },
+  fullscreenRoot: { flex: 1, backgroundColor: "#000" },
+  fullscreenCameraContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
   cameraImage: {
     position: "absolute",
     top: 0,
@@ -1461,6 +1693,56 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 1,
+  },
+  cameraNameBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    maxWidth: "48%",
+    overflow: "hidden",
+    borderRadius: 6,
+    backgroundColor: "rgba(17, 24, 39, 0.72)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    color: Colors.white,
+    fontFamily: Fonts.interMedium,
+    fontSize: 11,
+  },
+  fullscreenCameraName: {
+    position: "absolute",
+    top: 44,
+    right: 18,
+    maxWidth: "48%",
+    overflow: "hidden",
+    borderRadius: 7,
+    backgroundColor: "rgba(17, 24, 39, 0.72)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    color: Colors.white,
+    fontFamily: Fonts.interMedium,
+    fontSize: 13,
+  },
+  fullscreenButton: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(17, 24, 39, 0.76)",
+  },
+  fullscreenExitButton: {
+    position: "absolute",
+    top: 42,
+    left: 16,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "rgba(17, 24, 39, 0.76)",
   },
   nvBadge: {
     position: "absolute",
@@ -1530,7 +1812,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textPrimary,
   },
-  actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cameraActionsCard: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    elevation: 2,
+  },
+  cameraActionButton: {
+    flex: 2,
+    minWidth: 0,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  primaryCameraAction: {
+    borderColor: Colors.secondaryLight,
+    backgroundColor: Colors.secondaryLight,
+  },
+  secondaryCameraAction: {
+    borderColor: Colors.criticalLight,
+    backgroundColor: "#FFF7F6",
+  },
+  cameraActionText: {
+    fontFamily: Fonts.interSemiBold,
+    fontSize: 12,
+    color: Colors.secondaryDark,
+  },
+  criticalActionText: { color: Colors.critical },
+  disabledCameraAction: {
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.background,
+  },
+  disabledCameraActionText: { color: Colors.textDisabled },
+  dischargeIconButton: {
+    flex: 1,
+    minWidth: 44,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.criticalLight,
+    borderRadius: 10,
+    backgroundColor: Colors.criticalLight,
+  },
   installCameraBtn: {
     alignSelf: "flex-start",
     flexDirection: "row",
@@ -1566,44 +1898,10 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: Colors.backgroundNurse,
   },
-  unpairCameraBtn: {
-    alignSelf: "flex-start",
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.criticalLight,
-    paddingHorizontal: 10,
-  },
-  unpairCameraBtnText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 12,
-    color: Colors.critical,
-  },
-  reportBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
   reportBtnText: {
     fontFamily: Fonts.interSemiBold,
     fontSize: 13,
     color: Colors.primary,
-  },
-  dangerCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: Colors.criticalLight,
   },
   dangerTitle: {
     fontFamily: Fonts.interSemiBold,
@@ -1611,21 +1909,5 @@ const styles = StyleSheet.create({
     color: Colors.critical,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-  dischargeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.critical,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignSelf: "flex-start",
-  },
-  dischargeBtnText: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 13,
-    color: Colors.critical,
   },
 });

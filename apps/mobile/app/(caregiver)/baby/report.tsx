@@ -6,16 +6,15 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { LoadingLogo } from "../../../components/ui/LoadingLogo";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Icon } from "../../../components/ui/Icon";
 import { Colors } from "../../../constants/colors";
 import { Fonts, Typography } from "../../../constants/fonts";
 import { Radii, Spacing } from "../../../constants/ui";
 import { reportService } from "../../../services/report.service";
-import { ReportHistoryItem } from "../../../types";
 import { useTheme } from "../../../context/ThemeContext";
 
 // Catatan: Pastikan interface DailyReport di types.ts milikmu sudah diubah menjadi seperti ini!
@@ -26,7 +25,6 @@ interface DailyReport {
   totalCryingMinutes: number;
   totalCryingEvents: number;
   totalAnomalyEvents: number;
-  anomalyEventCounts: Record<string, number>;
   hourlyActivities: {
     hour: number;
     sleepMinutes: number;
@@ -44,9 +42,6 @@ export default function NurseBabyReportScreen() {
   }>();
 
   const [report, setReport] = useState<DailyReport | null>(null);
-  const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
-  const [isHistoryError, setIsHistoryError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isReportError, setIsReportError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -76,36 +71,10 @@ export default function NurseBabyReportScreen() {
       setIsRefreshing(false);
     }
   }, [babyId, selectedDate]);
-  const fetchReportHistory = useCallback(async () => {
-    if (!babyId) {
-      setReportHistory([]);
-      setIsHistoryError(false);
-      setIsHistoryLoading(false);
-      return;
-    }
-
-    try {
-      const data = await reportService.getReportList(babyId);
-      setReportHistory(data ?? []);
-      setIsHistoryError(false);
-    } catch (error) {
-      console.error("[CaregiverReport] Gagal memuat riwayat laporan:", error);
-      setReportHistory([]);
-      setIsHistoryError(true);
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [babyId]);
-
   useEffect(() => {
     setIsLoading(true);
     void fetchReport();
   }, [fetchReport]);
-
-  useEffect(() => {
-    setIsHistoryLoading(true);
-    void fetchReportHistory();
-  }, [fetchReportHistory]);
 
   const goDay = (dir: -1 | 1) => {
     const d = new Date(selectedDate);
@@ -161,13 +130,17 @@ export default function NurseBabyReportScreen() {
             onRefresh={() => {
               setIsRefreshing(true);
 
-              void Promise.all([fetchReport(), fetchReportHistory()]);
+              void fetchReport();
             }}
-            colors={[Colors.secondary]}
-            tintColor={Colors.secondary}
+            colors={["transparent"]}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         {/* Date picker */}
         <View style={styles.datePicker}>
           <TouchableOpacity
@@ -205,7 +178,7 @@ export default function NurseBabyReportScreen() {
 
         {isLoading ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator color={Colors.secondary} size="large" />
+            <LoadingLogo color={Colors.secondary} size="large" />
           </View>
         ) : !babyId ? (
           <View style={styles.centerBox}>
@@ -294,112 +267,6 @@ export default function NurseBabyReportScreen() {
             <View style={[styles.card, { padding: 16, gap: 6 }]}>
               <Text style={styles.cardTitle}>Anomali terdeteksi</Text>
               <Text style={styles.summaryVal}>{report.totalAnomalyEvents ?? 0} kejadian</Text>
-              {Object.entries(report.anomalyEventCounts ?? {}).map(([type, count]) => (
-                <Text key={type} style={styles.legendText}>{type}: {count}x</Text>
-              ))}
-            </View>
-
-            <View style={styles.historyCard}>
-              <View style={styles.historyHeader}>
-                <Text style={styles.historyTitle}>Riwayat Laporan</Text>
-                <Text style={styles.historySubtitle}>
-                  Pilih tanggal laporan
-                </Text>
-              </View>
-
-              {isHistoryLoading ? (
-                <View style={styles.historyLoading}>
-                  <ActivityIndicator size="small" color={Colors.secondary} />
-                  <Text style={styles.historyLoadingText}>
-                    Memuat riwayat...
-                  </Text>
-                </View>
-              ) : isHistoryError ? (
-                <View style={styles.historyErrorContainer}>
-                  <Text style={styles.historyError}>
-                    Riwayat laporan gagal dimuat. Silakan coba lagi.
-                  </Text>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setIsHistoryLoading(true);
-                      setIsHistoryError(false);
-                      void fetchReportHistory();
-                    }}
-                    style={styles.retryButton}
-                  >
-                    <Text style={styles.retryButtonText}>Coba Lagi</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : reportHistory.length === 0 ? (
-                <Text style={styles.historyEmpty}>
-                  Belum ada riwayat laporan.
-                </Text>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.historyList}
-                >
-                  {reportHistory.map((item) => {
-                    const isSelected = item.date === selectedDate;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.date}
-                        style={[
-                          styles.historyItem,
-                          isSelected && styles.historyItemSelected,
-                        ]}
-                        onPress={() => setSelectedDate(item.date)}
-                      >
-                        <Text
-                          style={[
-                            styles.historyDate,
-                            isSelected && styles.historyDateSelected,
-                          ]}
-                        >
-                          {new Date(`${item.date}T00:00:00`).toLocaleDateString(
-                            "id-ID",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Tidur {Math.round(item.total_sleep_minutes)}m
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Bangun {Math.round(item.total_awake_minutes)}m
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Menangis {item.total_crying_events}x
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
             </View>
 
             {/* Aktivitas Chart (Tidur, Bangun, Menangis) */}
@@ -580,77 +447,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textMuted,
     textAlign: "center",
-  },
-  historyCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 16,
-    gap: 12,
-  },
-  historyHeader: {
-    gap: 3,
-  },
-  historyTitle: {
-    fontFamily: Fonts.nunitoBold,
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  historySubtitle: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  historyList: {
-    gap: 10,
-  },
-  historyItem: {
-    width: 145,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: Colors.backgroundNurse,
-    gap: 4,
-  },
-  historyItemSelected: {
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.secondary,
-  },
-  historyDate: {
-    fontFamily: Fonts.interSemiBold,
-    fontSize: 12,
-    color: Colors.textPrimary,
-  },
-  historyDateSelected: {
-    color: Colors.secondaryDark,
-  },
-  historyMeta: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 10,
-    color: Colors.textMuted,
-  },
-  historyMetaSelected: {
-    color: Colors.secondaryDark,
-  },
-  historyLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  historyLoadingText: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  historyEmpty: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  historyErrorContainer: { gap: 8, alignItems: "flex-start" },
-  historyError: {
-    fontFamily: Fonts.interRegular,
-    fontSize: 12,
-    color: Colors.critical,
   },
   card: {
     backgroundColor: Colors.white,

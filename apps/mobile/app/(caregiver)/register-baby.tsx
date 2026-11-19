@@ -7,12 +7,12 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Modal,
   Platform,
   TextInputInstance,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
@@ -432,7 +432,7 @@ export default function RegisterBabyScreen() {
           activeOpacity={0.85}
         >
           {isLoading ? (
-            <ActivityIndicator color={Colors.white} />
+            <LoadingLogo color={Colors.white} />
           ) : (
             <>
               <Icon

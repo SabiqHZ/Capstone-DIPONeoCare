@@ -7,13 +7,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useAuthStore } from "../../stores/auth.store";
 import { reportService } from "../../services/report.service";
-import { DailyReport, ReportHistoryItem } from "../../types";
+import { DailyReport } from "../../types";
 import { Colors } from "../../constants/colors";
 import { formatDurationMinutes } from "../../utils/duration";
 import { Fonts, Typography } from "../../constants/fonts";
@@ -38,9 +38,6 @@ export default function ReportScreen() {
     null,
   );
   const [isPreviousReportLoading, setIsPreviousReportLoading] = useState(true);
-  const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
-  const [isHistoryError, setIsHistoryError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isReportError, setIsReportError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -101,36 +98,10 @@ export default function ReportScreen() {
       setIsPreviousReportLoading(false);
     }
   }, [babyId, previousDate]);
-  const fetchReportHistory = useCallback(async () => {
-    if (!babyId) {
-      setReportHistory([]);
-      setIsHistoryError(false);
-      setIsHistoryLoading(false);
-      return;
-    }
-
-    try {
-      const data = await reportService.getReportList(babyId);
-      setReportHistory(data ?? []);
-      setIsHistoryError(false);
-    } catch (error) {
-      console.error("[ParentReport] Gagal memuat riwayat laporan:", error);
-      setReportHistory([]);
-      setIsHistoryError(true);
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [babyId]);
-
   useEffect(() => {
     setIsLoading(true);
     void fetchReport();
   }, [fetchReport]);
-
-  useEffect(() => {
-    setIsHistoryLoading(true);
-    void fetchReportHistory();
-  }, [fetchReportHistory]);
 
   useEffect(() => {
     void fetchPreviousReport();
@@ -236,18 +207,22 @@ export default function ReportScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
             onRefresh={() => {
               setIsRefreshing(true);
               void Promise.all([
                 fetchReport(),
-                fetchReportHistory(),
                 fetchPreviousReport(),
               ]);
             }}
-            colors={["#1D9E75"]}
+            colors={["transparent"]}
           />
         }
       >
+        {isRefreshing ? (
+          <LoadingLogo size={36} style={{ position: "absolute", top: 10, alignSelf: "center", zIndex: 20 }} />
+        ) : null}
         <Text style={[styles.title, isDark && { color: "#A7F3D0" }]}>
           Laporan Harian
         </Text>
@@ -308,7 +283,7 @@ export default function ReportScreen() {
 
         {isLoading ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator size="large" color="#1D9E75" />
+            <LoadingLogo size="large" color="#1D9E75" />
             <Text style={styles.loadingText}>Memuat laporan...</Text>
           </View>
         ) : !babyId ? (
@@ -418,100 +393,7 @@ export default function ReportScreen() {
 
             <View style={[styles.chartCard, isDark && { backgroundColor: "#1F2937" }, { padding: 16 }]}>
               <Text style={styles.chartTitle}>Anomali terdeteksi</Text>
-              <Text style={styles.chartSubtitle}>{report.totalAnomalyEvents ?? 0} kejadian pada tanggal ini</Text>
-              {Object.entries(report.anomalyEventCounts ?? {}).map(([type, count]) => (
-                <Text key={type} style={styles.legendText}>{type}: {count}x</Text>
-              ))}
-            </View>
-
-            <View
-              style={[
-                styles.historyCard,
-                isDark && { backgroundColor: "#1F2937" },
-              ]}
-            >
-              <View style={styles.historyHeader}>
-                <Text style={styles.historyTitle}>Riwayat Laporan</Text>
-                <Text style={styles.historySubtitle}>
-                  Pilih tanggal laporan
-                </Text>
-              </View>
-
-              {isHistoryLoading ? (
-                <View style={styles.historyLoading}>
-                  <ActivityIndicator size="small" color="#1D9E75" />
-                  <Text style={styles.historyLoadingText}>
-                    Memuat riwayat...
-                  </Text>
-                </View>
-              ) : isHistoryError ? (
-                <View style={styles.historyErrorContainer}>
-                  <Text style={styles.historyError}>
-                    Riwayat laporan gagal dimuat. Silakan coba lagi.
-                  </Text>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setIsHistoryLoading(true);
-                      setIsHistoryError(false);
-                      void fetchReportHistory();
-                    }}
-                    style={styles.retryButton}
-                  >
-                    <Text style={styles.retryButtonText}>Coba Lagi</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : reportHistory.length === 0 ? (
-                <Text style={styles.historyEmpty}>
-                  Belum ada riwayat laporan.
-                </Text>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.historyList}
-                >
-                  {reportHistory.map((item) => {
-                    const isSelected = item.date === selectedDate;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.date}
-                        style={[
-                          styles.historyItem,
-                          isSelected && styles.historyItemSelected,
-                        ]}
-                        onPress={() => setSelectedDate(item.date)}
-                      >
-                        <Text
-                          style={[
-                            styles.historyDate,
-                            isSelected && styles.historyDateSelected,
-                          ]}
-                        >
-                          {new Date(`${item.date}T00:00:00`).toLocaleDateString(
-                            "id-ID",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyMeta,
-                            isSelected && styles.historyMetaSelected,
-                          ]}
-                        >
-                          Tidur {formatDuration(item.total_sleep_minutes)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
+              <Text style={styles.chartSubtitle}>{report.totalAnomalyEvents ?? 0} kejadian</Text>
             </View>
 
             <View
@@ -700,70 +582,6 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     color: "#6B7280",
   },
-  historyCard: {
-    backgroundColor: "#fff",
-    borderRadius: Radii.card,
-    padding: Spacing.cardPadding,
-    gap: 12,
-    elevation: 1,
-  },
-  historyHeader: {
-    gap: 3,
-  },
-  historyTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  historySubtitle: {
-    fontSize: 11,
-    color: "#6B7280",
-  },
-  historyList: {
-    gap: 10,
-  },
-  historyItem: {
-    width: 145,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    gap: 4,
-  },
-  historyItemSelected: {
-    backgroundColor: "#E8F7F1",
-    borderWidth: 1,
-    borderColor: "#1D9E75",
-  },
-  historyDate: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-  },
-  historyDateSelected: {
-    color: "#0F6E56",
-  },
-  historyMeta: {
-    fontSize: 10,
-    color: "#6B7280",
-  },
-  historyMetaSelected: {
-    color: "#35685A",
-  },
-  historyLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  historyLoadingText: {
-    fontSize: 11,
-    color: "#6B7280",
-  },
-  historyEmpty: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-  historyErrorContainer: { gap: 8, alignItems: "flex-start" },
-  historyError: { fontSize: 12, color: "#B42318" },
   chartCard: {
     backgroundColor: "#fff",
     borderRadius: Radii.card,

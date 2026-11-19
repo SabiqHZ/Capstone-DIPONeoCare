@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -15,6 +14,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import Svg, { Path, Circle, Line } from "react-native-svg";
@@ -314,7 +314,7 @@ export default function LoginScreen() {
                 activeOpacity={0.8}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <LoadingLogo color="#fff" />
                 ) : (
                   <Text style={styles.btnText}>Masuk</Text>
                 )}
@@ -329,7 +329,7 @@ export default function LoginScreen() {
               accessibilityHint="Membuka WhatsApp atau email untuk meminta bantuan pemulihan akun"
             >
               {isContactingAdmin ? (
-                <ActivityIndicator size="small" color={Colors.secondaryDark} />
+                <LoadingLogo size="small" color={Colors.secondaryDark} />
               ) : (
                 <Text style={styles.recoveryText}>
                   Lupa password?{" "}

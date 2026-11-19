@@ -10,12 +10,12 @@ import {
   TouchableOpacity,
   Dimensions,
   RefreshControl,
-  ActivityIndicator,
   Modal,
   TouchableWithoutFeedback,
   Pressable,
   Alert,
 } from "react-native";
+import { LoadingLogo } from "../../components/ui/LoadingLogo";
 import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "../../stores/auth.store";
@@ -718,7 +718,7 @@ export default function NurseDashboard() {
 
       {isLoading ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={Colors.secondary} />
+          <LoadingLogo size="large" color={Colors.secondary} />
           <Text style={[styles.loadingText, isDark && { color: "#D1D5DB" }]}>
             Memuat data bayi...
           </Text>
@@ -781,11 +781,23 @@ export default function NurseDashboard() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={[Colors.secondary]}
-              tintColor={Colors.secondary}
+              colors={["transparent"]}
+              tintColor="transparent"
+              progressBackgroundColor="transparent"
             />
           }
         >
+          {isRefreshing ? (
+            <LoadingLogo
+              size={36}
+              style={{
+                position: "absolute",
+                top: 10,
+                alignSelf: "center",
+                zIndex: 20,
+              }}
+            />
+          ) : null}
           {filteredBabies.length > 0 ? (
             filteredBabies.map((baby) => (
               <BabyCard
@@ -1241,7 +1253,7 @@ export default function NurseDashboard() {
                 accessibilityRole="button"
               >
                 {isLoggingOut ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
+                  <LoadingLogo size="small" color={Colors.white} />
                 ) : (
                   <Text style={styles.logoutConfirmText}>Keluar</Text>
                 )}

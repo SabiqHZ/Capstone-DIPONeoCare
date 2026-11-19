@@ -8,10 +8,11 @@ import { Radii, Spacing } from "../../constants/ui";
 interface Props {
   visible: boolean;
   onDismiss: () => void;
+  onContactCaregiver?: () => void;
   anomalyType?: string | null;
 }
 
-export function FaceAnomalyBanner({ visible, onDismiss, anomalyType }: Props) {
+export function FaceAnomalyBanner({ visible, onDismiss, onContactCaregiver, anomalyType }: Props) {
   if (!visible) {
     return null;
   }
@@ -35,6 +36,19 @@ export function FaceAnomalyBanner({ visible, onDismiss, anomalyType }: Props) {
             ? `Singkirkan ${anomalyType} dari area wajah bayi.`
             : "Singkirkan benda dari area wajah bayi."}
         </Text>
+        {onContactCaregiver ? (
+          <TouchableOpacity
+            style={styles.contactButton}
+            onPress={onContactCaregiver}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Hubungi pengasuh melalui WhatsApp"
+            accessibilityHint="Membuka WhatsApp dengan pesan bahwa wajah bayi tertutupi"
+          >
+            <Icon name="logo-whatsapp" library="ionicons" size={17} color={Colors.criticalDark} />
+            <Text style={styles.contactButtonText}>Hubungi Pengasuh</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <TouchableOpacity
@@ -86,6 +100,23 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     lineHeight: 18,
     color: "rgba(255,255,255,0.86)",
+  },
+
+  contactButton: {
+    minHeight: 38,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 10,
+    marginTop: 5,
+    borderRadius: 9,
+    backgroundColor: Colors.white,
+  },
+  contactButtonText: {
+    ...Typography.captionStrong,
+    color: Colors.criticalDark,
   },
 
   dismissBtn: {
